@@ -17,7 +17,7 @@ def getTopmostExplorerHwnd():
 
 	return topmostHwnd
 
-def getSelectedFilesFromExplorerHelper():
+def getSelectedFilesFromExplorerRaw():
 	targetHwnd = getTopmostExplorerHwnd()
 	if not targetHwnd:
 		return []
@@ -34,7 +34,7 @@ def getSelectedFilesFromExplorerHelper():
 	return []
 
 def getSelectedFilesFromExplorer():
-	selectedFiles = getSelectedFilesFromExplorerHelper()
+	selectedFiles = getSelectedFilesFromExplorerRaw()
 
 	if not selectedFiles:
 		raise SimpleError("No files/folders selected")

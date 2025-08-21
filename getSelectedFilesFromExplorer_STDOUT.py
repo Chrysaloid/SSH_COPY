@@ -1,5 +1,5 @@
-﻿from getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
+﻿from getSelectedFilesFromExplorer import getSelectedFilesFromExplorerRaw
 
-selectedFiles = getSelectedFilesFromExplorer()
+selectedFiles = getSelectedFilesFromExplorerRaw()
 
 print("\n".join(selectedFiles), end="")
