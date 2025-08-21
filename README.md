@@ -45,11 +45,11 @@ C:\PythonScripts\SSH_COPY
 
 We provide guide for Nautilus. Set up on other file managers should be similar.
 
-Copy `SSH_SEND.sh` to `~/.local/share/nautilus/scripts` and replace placeholders in it.
+Copy `ssh-send.sh` to `~/.local/share/nautilus/scripts` and replace placeholders in it.
 
-Or open `SSH_COPY` folder in terrminal and run `bash SETUP_FILE.sh SSH_SEND.sh` (I recommend you inspect it before you run it). It should open the copied file in your default text editor so you can replace placeholders inside it.
+Or open `SSH_COPY` folder in terrminal and run `bash setup-file.sh ssh-send.sh` (I recommend you inspect it before you run it). It should open the copied file in your default text editor so you can replace placeholders inside it.
 
-Then in Nautilus you can select file(s) and/or folder(s) and right click and then `Scripts > SSH_SEND.sh`.
+Then in Nautilus you can select file(s) and/or folder(s) and right click and then `Scripts > ssh-send.sh`.
 
 **Example of successful output:**
 ```
@@ -57,7 +57,7 @@ Then in Nautilus you can select file(s) and/or folder(s) and right click and the
 Attempting to connect to Hello@192.168.0.123 ...
 Transfering files:
 
-SSH_SEND.sh
+ssh-send.sh
 
 Successfully transferred 1 file(s)
 ```

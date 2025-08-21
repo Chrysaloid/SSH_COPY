@@ -17,14 +17,14 @@ if WINDOWS:
 	from getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
 	ctypes.windll.kernel32.SetConsoleTitleW(TITLE) # Hide title from shortcut
 else:
-	from getSelectedFilesFromSTDIN import getSelectedFilesFromSTDIN
+	from getSelectedFilesFromStdIn import getSelectedFilesFromStdIn
 	print(f"\33]0;{TITLE}\a", end="", flush=True) # Hide title
 
 os.system("color")
 
 username, hostname, password, remoteFolder = getArguments()
 
-selectedFiles = getSelectedFilesFromExplorer() if WINDOWS else getSelectedFilesFromSTDIN()
+selectedFiles = getSelectedFilesFromExplorer() if WINDOWS else getSelectedFilesFromStdIn()
 
 # Main upload process
 ssh = getSSH(username, hostname, password, SSH_TIMEOUT)

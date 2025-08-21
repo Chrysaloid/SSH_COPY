@@ -2,7 +2,7 @@
 import sys
 from SimpleError import SimpleError
 
-def getSelectedFilesFromSTDIN():
+def getSelectedFilesFromStdIn():
 	selectedFiles = sys.stdin.read().splitlines()
 
 	if not selectedFiles:
