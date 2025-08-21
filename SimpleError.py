@@ -11,7 +11,6 @@ class SimpleError(Exception):
 	def __str__(self):
 		return self.message
 
-# Custom hook
 def custom_excepthook(exc_type, exc_value, exc_traceback):
 	if issubclass(exc_type, SimpleError):
 		print(exc_value)
