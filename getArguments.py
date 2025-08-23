@@ -2,8 +2,8 @@
 from termcolor import colored as clr
 from SimpleError import SimpleError
 
-def getArguments():
-	if len(sys.argv) < 5:
-		raise SimpleError(f"{clr("Not enough input arguments:", "red")} {clr(len(sys.argv), "yellow")} were provided out of required 5", "")
+def getArguments(expectedNumArgs: int):
+	if len(sys.argv) < expectedNumArgs:
+		raise SimpleError(f"{clr("Not enough input arguments:", "red")} {clr(len(sys.argv), "yellow")} were provided out of required {expectedNumArgs}", "")
 
-	return sys.argv[1:5] # username, hostname, password, remoteFolder
+	return sys.argv[1:expectedNumArgs]

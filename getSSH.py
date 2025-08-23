@@ -9,11 +9,8 @@ from paramiko.ssh_exception import (
 	PartialAuthentication,
 )
 from SimpleError import SimpleError
-from isOnline import exitIfOffline
 
-def getSSH(username, hostname, password, TIMEOUT):
-	exitIfOffline(hostname)
-
+def getSSH(username: str, hostname: str, password: str, TIMEOUT: float):
 	ssh = paramiko.SSHClient()
 	ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 

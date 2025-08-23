@@ -2,8 +2,8 @@
 import sys
 from SimpleError import SimpleError
 
-def getSelectedFilesFromStdIn():
-	selectedFiles = sys.stdin.read().splitlines()
+def getSelectedFilesFromStdIn(fileIO = sys.stdin):
+	selectedFiles = [line.strip() for line in fileIO if line.strip()]
 
 	if not selectedFiles:
 		raise SimpleError("No files/folders selected")

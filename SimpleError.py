@@ -2,7 +2,7 @@
 from termcolor import colored as clr
 
 class SimpleError(Exception):
-	def __init__(self, message, color = "red"):
+	def __init__(self, message: str, color = "red"):
 		if color:
 			self.message = clr(message, color)
 		else:
