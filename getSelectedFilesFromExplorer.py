@@ -31,6 +31,7 @@ def getSelectedFilesFromExplorer(infoAndError=True, forwardSlashes=True) -> list
 						selectedFiles = [item.Path.replace("\\", "/") for item in window.Document.SelectedItems()]
 					else:
 						selectedFiles = [item.Path for item in window.Document.SelectedItems()]
+					break
 			except Exception as e:
 				print(e)
 
