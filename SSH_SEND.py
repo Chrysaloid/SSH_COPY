@@ -2,6 +2,7 @@
 from termcolor import colored as clr
 import os
 import paramiko
+import stat
 from time import sleep
 import argparse
 
@@ -44,16 +45,28 @@ ssh = getSSH(username, hostname, password, SSH_TIMEOUT, port=port)
 
 sftp = ssh.open_sftp()
 
+def remoteFolderExists(sftp: paramiko.SFTPClient, remotePath: str) -> bool:
+	try:
+		info = sftp.stat(remotePath) # Raises FileNotFoundError if it doesn't exist
+		return stat.S_ISDIR(info.st_mode) # True if it's a directory
+	except FileNotFoundError:
+		return False
+
+if not remoteFolderExists(sftp, remoteFolder):
+	raise SimpleError(f'The remote folder "{remoteFolder}" does not exist')
+
 totalFiles = 0
 baseFolder = os.path.dirname(selectedFiles[0])
 def sftpUpload(sftp: paramiko.SFTPClient, localPath: str, remotePath: str):
 	"""Upload file or folder recursively, printing relative paths."""
 	global totalFiles
-	if os.path.isfile(localPath):
-		sftp.put(localPath, remotePath)
+	statInfo = os.stat(localPath)
+	if stat.S_ISREG(statInfo.st_mode): # is file?
 		print(os.path.relpath(localPath, baseFolder))
+		sftp.put(localPath, remotePath)
+		# sftp.utime(remotePath, (statInfo.st_atime, statInfo.st_mtime))
 		totalFiles += 1
-	elif os.path.isdir(localPath):
+	elif stat.S_ISDIR(statInfo.st_mode): # is directory?
 		try:
 			sftp.mkdir(remotePath)
 		except IOError:
@@ -72,4 +85,4 @@ sftp.close()
 ssh.close()
 
 # sleep(1)
-# input("Press ENTER to continue...")
+input("Press ENTER to continue...")
