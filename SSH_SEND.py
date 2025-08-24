@@ -3,16 +3,14 @@ from termcolor import colored as clr
 import os
 import paramiko
 import stat
-from time import sleep
 import argparse
 
 from SimpleError import SimpleError
 from getSSH import getSSH
 from getPlatform import WINDOWS
 
-TITLE = "SSH COPY"
+TITLE = "SSH SEND"
 SSH_TIMEOUT = 0.5 # s, TCP 3-way handshake timeout
-EXPECTED_NUM_ARGS = 1 + 4
 
 if WINDOWS:
 	from getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
@@ -95,5 +93,4 @@ print(f"\nSuccessfully sent {clr(totalFiles, "green")} file(s)\n")
 sftp.close()
 ssh.close()
 
-# sleep(1)
 # input("Press ENTER to continue...")
