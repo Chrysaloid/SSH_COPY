@@ -1,6 +1,8 @@
 ﻿from termcolor import colored as clr, cprint
 import win32com.client
 import win32gui
+import ctypes
+
 from SimpleError import SimpleError
 
 def getTopmostExplorerHwnd() -> int | None:
@@ -13,6 +15,9 @@ def getTopmostExplorerHwnd() -> int | None:
 			topmostHwnd = hwnd
 			return False # Stop at first (topmost) Explorer window
 		return True
+
+	ctypes.windll.kernel32.SetLastError(0) # some modules (i.e. argparse) set LastError and win32gui.EnumWindows doesn't like it
+
 	win32gui.EnumWindows(enumHandler, None)
 
 	return topmostHwnd

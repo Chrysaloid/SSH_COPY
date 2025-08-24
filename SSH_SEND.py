@@ -1,18 +1,17 @@
 ﻿import ctypes
 from termcolor import colored as clr
 import os
-import sys
 import paramiko
 from time import sleep
+import argparse
 
 from SimpleError import SimpleError
-from getArguments import getArguments
 from getSSH import getSSH
+from getPlatform import WINDOWS
 
 TITLE = "SSH COPY"
 SSH_TIMEOUT = 0.5 # s, TCP 3-way handshake timeout
 EXPECTED_NUM_ARGS = 1 + 4
-WINDOWS = sys.platform == "win32"
 
 if WINDOWS:
 	from getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
@@ -22,12 +21,26 @@ else:
 	from getSelectedFilesFromStdIn import getSelectedFilesFromStdIn
 	print(f"\33]0;{TITLE}\a", end="", flush=True) # Hide title
 
-username, hostname, password, remoteFolder = getArguments(EXPECTED_NUM_ARGS)
+parser = argparse.ArgumentParser(description="Parse connection details")
+
+parser.add_argument("-u", "--username"    , required=True,        help="Remote username")
+parser.add_argument("-H", "--hostname"    , required=True,        help="Remote host address")
+parser.add_argument("-p", "--password"    , required=True,        help="Remote password")
+parser.add_argument("-r", "--remoteFolder", required=True,        help="Remote folder absolute path")
+parser.add_argument("-P", "--port"        , default=22, type=int, help="Remote port (default: 22)")
+
+args = parser.parse_args()
+
+username     = args.username
+hostname     = args.hostname
+password     = args.password
+remoteFolder = args.remoteFolder
+port         = args.port
 
 selectedFiles = getSelectedFilesFromExplorer() if WINDOWS else getSelectedFilesFromStdIn()
 
 # Main upload process
-ssh = getSSH(username, hostname, password, SSH_TIMEOUT)
+ssh = getSSH(username, hostname, password, SSH_TIMEOUT, port=port)
 
 sftp = ssh.open_sftp()
 

@@ -10,14 +10,14 @@ from paramiko.ssh_exception import (
 )
 from SimpleError import SimpleError
 
-def getSSH(username: str, hostname: str, password: str, TIMEOUT: float):
+def getSSH(username: str, hostname: str, password: str, TIMEOUT: float, port = 22):
 	ssh = paramiko.SSHClient()
 	ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
 	errorMessage = None
 	try:
 		print(f"Attempting to connect to {clr(username, "green")}@{clr(hostname, "green")} ...")
-		ssh.connect(hostname, username=username, password=password, timeout=TIMEOUT)
+		ssh.connect(hostname, username=username, password=password, timeout=TIMEOUT, port=port)
 	except BadHostKeyException:
 		errorMessage = f"ERROR: The server's host key could not be verified for {hostname}"
 	except AuthenticationException:
