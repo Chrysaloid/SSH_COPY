@@ -4,13 +4,15 @@ import os
 import paramiko
 import stat
 import argparse
+import time
 
 from SimpleError import SimpleError
 from getSSH import getSSH
 from getPlatform import WINDOWS
 
+start = time.time()
+
 TITLE = "SSH SEND"
-SSH_TIMEOUT = 0.5 # s, TCP 3-way handshake timeout
 
 if WINDOWS:
 	from getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
@@ -28,23 +30,29 @@ parser.add_argument("-p", "--password"     , required=True, help="Remote passwor
 parser.add_argument("-r", "--remote-folder", required=True, help="Remote folder absolute path", dest="remoteFolder")
 
 parser.add_argument("-P", "--port"          , default=22, type=int, help="Remote port (default: 22)")
+parser.add_argument("-T", "--timeout"       , default=1, type=float, help="TCP 3-way handshake timeout in seconds (default: 1)")
 parser.add_argument("-t", "--preserve-times", action="store_true" , help="If set, modification times will be preserved", dest="preserveTimes")
 parser.add_argument("-0", "--zero-file"     , action="store_true" , help="Create a file named 0 at the end of transfer. Useful for file-watching scripts on the remote machine", dest="zeroFile")
+parser.add_argument("-c", "--end-command"   , help="Command to run on the remote machine after file transfer", dest="endCommand")
+parser.add_argument("-d", "--dont-close"    , action="store_true" , help="Don't auto-close console window at the end if no error occured. You will have to close it manually or by pressing ENTER", dest="dontClose")
 
 args = parser.parse_args()
 
-username      : str  = args.username
-hostname      : str  = args.hostname
-password      : str  = args.password
-remoteFolder  : str  = args.remoteFolder
-port          : int  = args.port
-preserveTimes : bool = args.preserveTimes
-zeroFile      : bool = args.zeroFile
+username      : str   = args.username
+hostname      : str   = args.hostname
+password      : str   = args.password
+remoteFolder  : str   = args.remoteFolder
+port          : int   = args.port
+timeout       : float = args.timeout
+preserveTimes : bool  = args.preserveTimes
+zeroFile      : bool  = args.zeroFile
+endCommand    : str   = args.endCommand
+dontClose     : bool  = args.dontClose
 
 selectedFiles = getSelectedFilesFromExplorer() if WINDOWS else getSelectedFilesFromStdIn()
 
 # Main upload process
-ssh = getSSH(username, hostname, password, SSH_TIMEOUT, port=port)
+ssh = getSSH(username, hostname, password, timeout, port=port)
 
 sftp = ssh.open_sftp()
 
@@ -85,12 +93,32 @@ for path in selectedFiles:
 	sftpUpload(sftp, path, remoteTarget)
 
 if zeroFile:
+	print("Sending 0 file")
 	with sftp.open(os.path.join(remoteFolder, "0").replace("\\", "/"), "w"):
 		pass
 
-print(f"\nSuccessfully sent {clr(totalFiles, "green")} file(s)\n")
-
 sftp.close()
+print(f"\nSuccessfully sent {clr(totalFiles + int(zeroFile), "green")} file(s)\n")
+
+if endCommand:
+	endCommand = endCommand.strip()
+	if endCommand:
+		print(f"Executing remote command '{endCommand}'...\n")
+
+		channel = ssh.get_transport().open_session()
+		channel.exec_command(endCommand)
+		channel.set_combine_stderr(True) # Combine stdout + stderr into one stream
+		with channel.makefile("r") as stream: # Wrap the channel in a file-like object and iterate
+			for line in stream:
+				print(line, end="") # line already has \n
+
+		exitStatus = channel.recv_exit_status()
+		if exitStatus:
+			print(f"{clr("Exit status:", "red")} {clr(exitStatus, "on_red")}")
+
 ssh.close()
 
-# input("Press ENTER to continue...")
+print(f"\nExecution time: {time.time() - start:.3f} s")
+
+if dontClose:
+	input("\nPress ENTER to continue...")
