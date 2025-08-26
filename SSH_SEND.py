@@ -100,6 +100,7 @@ if zeroFile:
 sftp.close()
 print(f"\nSuccessfully sent {clr(totalFiles + int(zeroFile), "green")} file(s)\n")
 
+exitStatus = 0
 if endCommand:
 	endCommand = endCommand.strip()
 	if endCommand:
@@ -119,6 +120,9 @@ if endCommand:
 ssh.close()
 
 print(f"\nExecution time: {time.time() - start:.3f} s")
+
+if exitStatus:
+	exit(exitStatus)
 
 if dontClose:
 	input("\nPress ENTER to continue...")
