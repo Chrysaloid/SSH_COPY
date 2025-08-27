@@ -1,4 +1,4 @@
-﻿from getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
+from getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
 
 selectedFiles = getSelectedFilesFromExplorer(infoAndError=False)
 

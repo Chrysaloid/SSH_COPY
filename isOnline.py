@@ -1,4 +1,4 @@
-﻿from pythonping import ping
+from pythonping import ping
 
 def isOnline(ip: str, timeout = 0.5) -> bool:
 	try:

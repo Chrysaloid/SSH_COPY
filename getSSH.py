@@ -1,4 +1,4 @@
-﻿from termcolor import colored as clr, cprint
+from termcolor import colored as clr, cprint
 import socket
 import paramiko
 from paramiko.ssh_exception import (

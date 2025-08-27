@@ -1,4 +1,4 @@
-﻿import ctypes
+import ctypes
 from termcolor import colored as clr
 import os
 import paramiko

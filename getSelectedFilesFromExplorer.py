@@ -1,4 +1,4 @@
-﻿from termcolor import colored as clr, cprint
+from termcolor import colored as clr, cprint
 import win32com.client
 import win32gui
 import ctypes

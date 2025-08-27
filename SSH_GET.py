@@ -1,4 +1,4 @@
-﻿from termcolor import colored as clr
+from termcolor import colored as clr
 import os
 import sys
 import paramiko

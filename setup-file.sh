@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 set -e # Exit immediately on error
 
 folder=~/.local/share/nautilus/scripts

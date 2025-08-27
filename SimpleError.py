@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 from termcolor import colored as clr
 
 class SimpleError(Exception):
