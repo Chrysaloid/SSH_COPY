@@ -1,47 +1,65 @@
 from termcolor import colored as clr
 import os
-import sys
-import paramiko
 import json
 import posixpath
+import argparse
 
 from SimpleError import SimpleError
-from getArguments import getArguments
 from getSSH import getSSH
-
-SSH_TIMEOUT = 0.5 # s, TCP 3-way handshake timeout
-EXPECTED_NUM_ARGS = 1 + 5
-WINDOWS = sys.platform == "win32"
+from getPlatform import WINDOWS
 
 if WINDOWS:
 	os.system("color")
 
-username, hostname, password, localFolder, remoteGetFilesScript = getArguments(EXPECTED_NUM_ARGS)
+parser = argparse.ArgumentParser(description="Parse connection details")
+
+parser.add_argument("-u", "--username"               , required=True, help="Remote username")
+parser.add_argument("-H", "--hostname"               , required=True, help="Remote host address")
+parser.add_argument("-p", "--password"               , required=True, help="Remote password")
+parser.add_argument("-r", "--local-folder"           , required=True, help="Remote folder absolute path", dest="localFolder")
+parser.add_argument("-r", "--remote-get-files-script", required=True, help="Remote folder absolute path", dest="remoteGetFilesScript")
+
+parser.add_argument("-P", "--port"          , default=22, type=int , help="Remote port (default: 22)")
+parser.add_argument("-T", "--timeout"       , default=1, type=float, help="TCP 3-way handshake timeout in seconds (default: 1)")
+parser.add_argument("-t", "--preserve-times", action="store_true"  , help="If set, modification times will be preserved", dest="preserveTimes")
+parser.add_argument("-d", "--dont-close"    , action="store_true"  , help="Don't auto-close console window at the end if no error occured. You will have to close it manually or by pressing ENTER", dest="dontClose")
+
+args = parser.parse_args()
+
+username             : str   = args.username
+hostname             : str   = args.hostname
+password             : str   = args.password
+localFolder          : str   = args.localFolder
+remoteGetFilesScript : str   = args.remoteGetFilesScript
+port                 : int   = args.port
+timeout              : float = args.timeout
+preserveTimes        : bool  = args.preserveTimes
+dontClose            : bool  = args.dontClose
 
 if not os.path.isdir(localFolder):
 	raise SimpleError(f'Folder "{localFolder}" does not exist')
 else:
 	localFolder = localFolder.replace("\\", "/")
 
-ssh = getSSH(username, hostname, password, SSH_TIMEOUT)
+ssh = getSSH(username, hostname, password, timeout, port)
 
-stdin, stdout, stderr = ssh.exec_command(f'python "{remoteGetFilesScript}"')
+stdIn, stdOut, stdErr = ssh.exec_command(f'python "{remoteGetFilesScript}"')
 
-exit_status = stdout.channel.recv_exit_status() # Wait for command to finish
+exitStatus = stdOut.channel.recv_exit_status() # Wait for command to finish
 
-if exit_status != 0: # Command failed
-	if exit_status == 69: # (¬‿¬)
-		print(stdout.read().decode("utf-8").strip())
+if exitStatus != 0: # Command failed
+	if exitStatus == 69: # (¬‿¬)
+		print(stdOut.read().decode("utf-8").strip())
 		raise SimpleError("No files/folders selected")
-	error_output = stderr.read().decode("utf-8").strip()
-	raise RuntimeError(f"Remote command failed with exit code {exit_status}:\n{error_output}")
+	errorOutput = stdErr.read().decode("utf-8").strip()
+	raise RuntimeError(f"Remote command failed with exit code {exitStatus}:\n{errorOutput}")
 
-raw_output = stdout.read().decode("utf-8")
+rawOutput = stdOut.read().decode("utf-8")
 try:
-	obj = json.loads(raw_output)
+	obj = json.loads(rawOutput)
 except json.JSONDecodeError as e:
 	ssh.close()
-	raise RuntimeError(f"Failed to parse JSON from remote script: {e}\nOutput:\n{raw_output}")
+	raise RuntimeError(f"Failed to parse JSON from remote script: {e}\nOutput:\n{rawOutput}")
 
 sftp = ssh.open_sftp()
 
@@ -58,10 +76,14 @@ for file in files:
 	remotePath = posixpath.join(baseFolder , file)
 	localPath  = posixpath.join(localFolder, file)
 	sftp.get(remotePath, localPath)
+	if preserveTimes:
+		info = sftp.stat(remotePath)
+		sftp.utime(localPath, (info.st_atime, info.st_mtime))
 	print(file)
 print(f"\nSuccessfully got {clr(len(files), "green")} file(s)\n")
 
 sftp.close()
 ssh.close()
 
-# input("Press ENTER to continue...")
+if dontClose:
+	input("\nPress ENTER to continue...")

@@ -52,7 +52,7 @@ dontClose     : bool  = args.dontClose
 selectedFiles = getSelectedFilesFromExplorer() if WINDOWS else getSelectedFilesFromStdIn()
 
 # Main upload process
-ssh = getSSH(username, hostname, password, timeout, port=port)
+ssh = getSSH(username, hostname, password, timeout, port)
 
 sftp = ssh.open_sftp()
 
