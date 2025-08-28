@@ -25,16 +25,16 @@ else:
 parser = argparse.ArgumentParser(description="Parse connection details")
 
 parser.add_argument("-u", "--username"     , required=True, help="Remote username")
-parser.add_argument("-H", "--hostname"     , required=True, help="Remote host address")
+parser.add_argument("-H", "--hostname"     , required=True, help="Remote host's address")
 parser.add_argument("-p", "--password"     , required=True, help="Remote password")
-parser.add_argument("-r", "--remote-folder", required=True, help="Remote folder absolute path", dest="remoteFolder")
+parser.add_argument("-r", "--remote-folder", required=True, help="Remote folder's absolute path", dest="remoteFolder")
 
 parser.add_argument("-P", "--port"          , default=22, type=int, help="Remote port (default: 22)")
 parser.add_argument("-T", "--timeout"       , default=1, type=float, help="TCP 3-way handshake timeout in seconds (default: 1)")
 parser.add_argument("-t", "--preserve-times", action="store_true" , help="If set, modification times will be preserved", dest="preserveTimes")
 parser.add_argument("-0", "--zero-file"     , action="store_true" , help="Create a file named 0 at the end of transfer. Useful for file-watching scripts on the remote machine", dest="zeroFile")
 parser.add_argument("-c", "--end-command"   , help="Command to run on the remote machine after file transfer", dest="endCommand")
-parser.add_argument("-d", "--dont-close"    , action="store_true" , help="Don't auto-close console window at the end if no error occured. You will have to close it manually or by pressing ENTER", dest="dontClose")
+parser.add_argument("-d", "--dont-close"    , action="store_true" , help="Don't auto-close console window at the end if no error occurred. You will have to close it manually or by pressing ENTER", dest="dontClose")
 
 args = parser.parse_args()
 
