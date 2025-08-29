@@ -10,7 +10,7 @@ from paramiko.ssh_exception import (
 )
 from SimpleError import SimpleError
 
-def getSSH(username: str, hostname: str, password: str, TIMEOUT: float, port = 22):
+def getSSH(username: str, hostname: str, password: str, TIMEOUT: float = 1, port = 22):
 	ssh = paramiko.SSHClient()
 	ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 

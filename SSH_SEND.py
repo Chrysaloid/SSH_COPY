@@ -1,20 +1,20 @@
-import ctypes
 from termcolor import colored as clr
 import os
 import paramiko
-import stat
 import argparse
 import time
+
+start = time.time()
 
 from SimpleError import SimpleError
 from getSSH import getSSH
 from getPlatform import WINDOWS
-
-start = time.time()
+from fileUtils import isFile, isDir, assertRemoteFolderExists
 
 TITLE = "SSH SEND"
 
 if WINDOWS:
+	import ctypes
 	from getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
 	ctypes.windll.kernel32.SetConsoleTitleW(TITLE) # Hide title from shortcut
 	os.system("color")
@@ -53,36 +53,26 @@ selectedFiles = getSelectedFilesFromExplorer() if WINDOWS else getSelectedFilesF
 
 # Main upload process
 ssh = getSSH(username, hostname, password, timeout, port)
-
 sftp = ssh.open_sftp()
 
-def remoteFolderExists(sftp: paramiko.SFTPClient, remotePath: str) -> bool:
-	try:
-		info = sftp.stat(remotePath) # Raises FileNotFoundError if it doesn't exist
-		return stat.S_ISDIR(info.st_mode) # True if it's a directory
-	except FileNotFoundError:
-		return False
-
-if not remoteFolderExists(sftp, remoteFolder):
-	raise SimpleError(f'The remote folder "{remoteFolder}" does not exist')
+assertRemoteFolderExists(sftp, remoteFolder)
 
 totalFiles = 0
 baseFolder = os.path.dirname(selectedFiles[0])
 def sftpUpload(sftp: paramiko.SFTPClient, localPath: str, remotePath: str):
 	"""Upload file or folder recursively, printing relative paths."""
 	global totalFiles
-	statInfo = os.stat(localPath)
-	if stat.S_ISREG(statInfo.st_mode): # is file?
+	fileInfo = os.stat(localPath)
+	if isFile(fileInfo):
 		print(os.path.relpath(localPath, baseFolder))
 		sftp.put(localPath, remotePath)
 		if preserveTimes:
-			sftp.utime(remotePath, (statInfo.st_atime, statInfo.st_mtime))
+			sftp.utime(remotePath, (fileInfo.st_atime, fileInfo.st_mtime))
 		totalFiles += 1
-	elif stat.S_ISDIR(statInfo.st_mode): # is directory?
+	elif isDir(fileInfo):
 		try:
 			sftp.mkdir(remotePath)
-		except IOError:
-			pass # Directory may already exist
+		except IOError: pass # Directory may already exist
 		for item in os.listdir(localPath):
 			sftpUpload(sftp, os.path.join(localPath, item), os.path.join(remotePath, item).replace("\\", "/"))
 
@@ -125,4 +115,4 @@ if exitStatus:
 	exit(exitStatus)
 
 if dontClose:
-	input("\nPress ENTER to continue...")
+	input(clr("\nPress ENTER to continue...", "green"))

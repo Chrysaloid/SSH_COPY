@@ -8,8 +8,14 @@ from SimpleError import SimpleError
 from getSSH import getSSH
 from getPlatform import WINDOWS
 
+TITLE = "SSH GET"
+
 if WINDOWS:
+	import ctypes
+	ctypes.windll.kernel32.SetConsoleTitleW(TITLE) # Hide title from shortcut
 	os.system("color")
+else:
+	print(f"\33]0;{TITLE}\a", end="", flush=True) # Hide title
 
 parser = argparse.ArgumentParser(description="Parse connection details")
 
@@ -78,7 +84,7 @@ for file in files:
 	sftp.get(remotePath, localPath)
 	if preserveTimes:
 		info = sftp.stat(remotePath)
-		sftp.utime(localPath, (info.st_atime, info.st_mtime))
+		os.utime(localPath, (info.st_atime, info.st_mtime))
 	print(file)
 print(f"\nSuccessfully got {clr(len(files), "green")} file(s)\n")
 
@@ -86,4 +92,4 @@ sftp.close()
 ssh.close()
 
 if dontClose:
-	input("\nPress ENTER to continue...")
+	input(clr("\nPress ENTER to continue...", "green"))
