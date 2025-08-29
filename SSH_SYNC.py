@@ -24,7 +24,7 @@ if WINDOWS:
 else:
 	print(f"\33]0;{TITLE}\a", end="", flush=True) # Hide title
 
-parser = argparse.ArgumentParser(description="Parse connection details")
+parser = argparse.ArgumentParser(description="Parse sync details")
 
 parser.add_argument("-u", "--username"     , required=True, help="Remote username")
 parser.add_argument("-H", "--hostname"     , required=True, help="Remote host's address")
@@ -35,13 +35,14 @@ parser.add_argument("-r", "--remote-folder", required=True, help="Remote folder'
 parser.add_argument("-i", "--include"          , default=[], action="append", help="Glob pattern for filenames to include")
 parser.add_argument("-e", "--exclude"          , default=[], action="append", help="Glob pattern for filenames to exclude")
 parser.add_argument("-n", "--newer-than"       , default="", help="Copy only files newer then this date", dest="newerThan")
-parser.add_argument("-N", "--newer-than-newest", action="store_true" , help="Copy only files newer then the newest files in the local folder", dest="newerThanNewest")
-parser.add_argument("-R", "--recursive"        , action="store_true" , help="Recurse into subdirectories")
-parser.add_argument("-v", "--verbose"          , action="store_true" , help="Print verbose information. Good for debugging")
-parser.add_argument("-P", "--port"             , default=22, type=int, help="Remote port (default: 22)")
+parser.add_argument("-N", "--newer-than-newest", action="store_true"  , help="Copy only files newer then the newest files in the local folder", dest="newerThanNewest")
+parser.add_argument("-R", "--recursive"        , action="store_true"  , help="Recurse into subdirectories")
+parser.add_argument("-v", "--verbose"          , action="store_true"  , help="Print verbose information. Good for debugging")
+parser.add_argument("-s", "--silent"           , action="store_true"  , help="Print only errors")
+parser.add_argument("-P", "--port"             , default=22, type=int , help="Remote port (default: 22)")
 parser.add_argument("-T", "--timeout"          , default=1, type=float, help="TCP 3-way handshake timeout in seconds (default: 1)")
-parser.add_argument("-t", "--preserve-times"   , action="store_true" , help="If set, modification times will be preserved", dest="preserveTimes")
-parser.add_argument("-d", "--dont-close"       , action="store_true" , help="Don't auto-close console window at the end if no error occurred. You will have to close it manually or by pressing ENTER", dest="dontClose")
+parser.add_argument("-t", "--preserve-times"   , action="store_true"  , help="If set, modification times will be preserved", dest="preserveTimes")
+parser.add_argument("-d", "--dont-close"       , action="store_true"  , help="Don't auto-close console window at the end if no error occurred. You will have to close it manually or by pressing ENTER", dest="dontClose")
 
 args = parser.parse_args()
 
@@ -55,11 +56,15 @@ exclude         : list  [str] = args.exclude
 newerThanNewest : bool        = args.newerThanNewest
 recursive       : bool        = args.recursive
 verbose         : bool        = args.verbose
+silent          : bool        = args.silent
 newerThan       : str         = args.newerThan
 port            : int         = args.port
 timeout         : float       = args.timeout
 preserveTimes   : bool        = args.preserveTimes
 dontClose       : bool        = args.dontClose
+
+if silent and verbose:
+	raise SimpleError("-s/--silent and -v/--verbose options cannot both be specified at the same time")
 
 if not os.path.isdir(localFolder):
 	raise SimpleError(f'Folder "{localFolder}" does not exist or is not a folder')
@@ -124,7 +129,7 @@ def fileMatch(filename: str):
 
 	return defaultFileMatch
 
-ssh = getSSH(username, hostname, password, timeout, port)
+ssh = getSSH(username, hostname, password, timeout, port, silent)
 sftp = ssh.open_sftp()
 
 try:
@@ -162,7 +167,8 @@ try:
 					remPath = posixpath.join(remoteFolderParam, filename)
 					# if not os.path.exists(locPath) or modifiedDate(os.stat(locPath)) < modifiedDate(fileInfo):
 					if not os.path.exists(locPath):
-						print(clr(os.path.relpath(remPath, remoteFolder), "green"))
+						if not silent:
+							print(clr(os.path.relpath(remPath, remoteFolder), "green"))
 						sftp.get(remPath, locPath)
 						if preserveTimes:
 							os.utime(locPath, (fileInfo.st_atime, fileInfo.st_mtime))
@@ -180,16 +186,21 @@ try:
 			elif verbose:
 				print(f'{relPath} - skipping because {"fileMatch returned False" if not fileMatch(filename) else f"it is older than {datetime.fromtimestamp(newerThanDate)}"}')
 
-	print(f"Local folder: {localFolder}")
-	print(f"Remote folder: {remoteFolder}")
-	print("Copying files:\n")
+	if not silent:
+		print(f"Local folder: {localFolder}")
+		print(f"Remote folder: {remoteFolder}")
+		print("Copying files:\n")
 
 	recursive_copy(remoteFolder, localFolder)
 
-	print(f"\nExecution time: {time.time() - start:.3f} s")
+	if not silent:
+		print(f"\nExecution time: {time.time() - start:.3f} s")
 
 	if dontClose:
-		input(clr("\nPress ENTER to continue...", "green"))
+		if silent:
+			input("")
+		else:
+			input(clr("\nPress ENTER to continue...", "green"))
 except SimpleError as e:
 	raise e
 finally:
