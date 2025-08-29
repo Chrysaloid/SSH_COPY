@@ -13,7 +13,7 @@ start = time.time()
 from SimpleError import SimpleError
 from getSSH import getSSH
 from getPlatform import WINDOWS
-from fileUtils import isFile, isDir, assertRemoteFolderExists, modifiedDate
+from fileUtils import isFile, isDir, assertRemoteFolderExists
 
 TITLE = "SSH SYNC"
 
@@ -32,35 +32,41 @@ parser.add_argument("-p", "--password"     , required=True, help="Remote passwor
 parser.add_argument("-l", "--local-folder" , required=True, help="Local folder's absolute path", dest="localFolder")
 parser.add_argument("-r", "--remote-folder", required=True, help="Remote folder's absolute path", dest="remoteFolder")
 
-parser.add_argument("-i", "--include"       , default=[], action="append", help="Glob pattern for filenames to include")
-parser.add_argument("-e", "--exclude"       , default=[], action="append", help="Glob pattern for filenames to exclude")
-parser.add_argument("-n", "--newer-than"    , default="", help="Copy only files newer then", dest="newerThan")
-parser.add_argument("-P", "--port"          , default=22, type=int, help="Remote port (default: 22)")
-parser.add_argument("-T", "--timeout"       , default=1, type=float, help="TCP 3-way handshake timeout in seconds (default: 1)")
-parser.add_argument("-t", "--preserve-times", action="store_true" , help="If set, modification times will be preserved", dest="preserveTimes")
-parser.add_argument("-d", "--dont-close"    , action="store_true" , help="Don't auto-close console window at the end if no error occurred. You will have to close it manually or by pressing ENTER", dest="dontClose")
+parser.add_argument("-i", "--include"          , default=[], action="append", help="Glob pattern for filenames to include")
+parser.add_argument("-e", "--exclude"          , default=[], action="append", help="Glob pattern for filenames to exclude")
+parser.add_argument("-n", "--newer-than"       , default="", help="Copy only files newer then this date", dest="newerThan")
+parser.add_argument("-N", "--newer-than-newest", action="store_true" , help="Copy only files newer then the newest files in the local folder", dest="newerThanNewest")
+parser.add_argument("-R", "--recursive"        , action="store_true" , help="Recurse into subdirectories")
+parser.add_argument("-v", "--verbose"          , action="store_true" , help="Print verbose information. Good for debugging")
+parser.add_argument("-P", "--port"             , default=22, type=int, help="Remote port (default: 22)")
+parser.add_argument("-T", "--timeout"          , default=1, type=float, help="TCP 3-way handshake timeout in seconds (default: 1)")
+parser.add_argument("-t", "--preserve-times"   , action="store_true" , help="If set, modification times will be preserved", dest="preserveTimes")
+parser.add_argument("-d", "--dont-close"       , action="store_true" , help="Don't auto-close console window at the end if no error occurred. You will have to close it manually or by pressing ENTER", dest="dontClose")
 
 args = parser.parse_args()
 
-username      : str       = args.username
-hostname      : str       = args.hostname
-password      : str       = args.password
-localFolder   : str       = args.localFolder
-remoteFolder  : str       = args.remoteFolder
-include       : list[str] = args.include
-exclude       : list[str] = args.exclude
-newerThan     : str       = args.newerThan
-port          : int       = args.port
-timeout       : float     = args.timeout
-preserveTimes : bool      = args.preserveTimes
-dontClose     : bool      = args.dontClose
+username        : str         = args.username
+hostname        : str         = args.hostname
+password        : str         = args.password
+localFolder     : str         = args.localFolder
+remoteFolder    : str         = args.remoteFolder
+include         : list  [str] = args.include
+exclude         : list  [str] = args.exclude
+newerThanNewest : bool        = args.newerThanNewest
+recursive       : bool        = args.recursive
+verbose         : bool        = args.verbose
+newerThan       : str         = args.newerThan
+port            : int         = args.port
+timeout         : float       = args.timeout
+preserveTimes   : bool        = args.preserveTimes
+dontClose       : bool        = args.dontClose
 
 if not os.path.isdir(localFolder):
-	raise SimpleError(f'Folder "{localFolder}" does not exist')
+	raise SimpleError(f'Folder "{localFolder}" does not exist or is not a folder')
 else:
 	localFolder = localFolder.replace("\\", "/")
 
-newerThanDate = None
+newerThanDate = 0
 if newerThan:
 	for format in [
 		"%Y",
@@ -71,12 +77,15 @@ if newerThan:
 		"%Y-%m-%d %H:%M:%S",
 	]:
 		try:
-			newerThanDate = datetime.strptime(newerThan, format)
+			newerThanDate = datetime.strptime(newerThan, format).timestamp()
 			break
 		except ValueError:
 			pass
 	if not newerThanDate:
 		raise SimpleError(f'Incorrect -n/--newer-than parameter: {newerThan}')
+
+if verbose:
+	print(f'Correctly parsed -n/--newer-than parameter "{newerThan}" as {datetime.fromtimestamp(newerThanDate)}')
 
 defaultFileMatch = True
 # fileMatchReasonable = include or exclude
@@ -101,6 +110,9 @@ if include and exclude:
 	# if exclude was first - match everything by default, if include was first - match nothing by default
 	defaultFileMatch = excludePos < includePos
 
+if verbose:
+	print(f'By default all {"files/folders" if recursive else "files"} will be {"included" if defaultFileMatch else "exluded"}')
+
 def fileMatch(filename: str):
 	for pattern in include:
 		if fnmatchcase(filename, pattern):
@@ -120,25 +132,53 @@ try:
 	remoteFolder = remoteFolder.replace("\\", "/")
 
 	def recursive_copy(remoteFolderParam: str, localFolderParam: str):
+		if verbose:
+			print(f"Entering remote folder: {remoteFolderParam}")
+		newestLocalDate = 0
+		if newerThanNewest:
+			if verbose:
+				print(f"Scanning local folder: {localFolderParam}")
+			fileCount = 0
+			with os.scandir(localFolderParam) as iter:
+				for entry in iter:
+					if entry.is_file():
+						fileCount += 1
+						if newestLocalDate < entry.stat().st_mtime:
+							newestLocalDate = entry.stat().st_mtime
+			if verbose:
+				print(f'It has {fileCount} files {f"and the newest from them has date {datetime.fromtimestamp(newestLocalDate)} -> newestLocalDate" if fileCount else ""}')
 		for fileInfo in sftp.listdir_attr(remoteFolderParam):
 			filename = fileInfo.filename
-			if fileMatch(filename) and (newerThanDate is None or newerThanDate <= modifiedDate(fileInfo)):
-				if isDir(fileInfo):
+			if verbose:
+				relPath = os.path.relpath(posixpath.join(remoteFolderParam, filename), remoteFolder)
+			if fileMatch(filename) and newerThanDate <= fileInfo.st_mtime:
+				if recursive and isDir(fileInfo):
 					newLocalFolder = posixpath.join(localFolderParam, filename)
 					os.makedirs(newLocalFolder, exist_ok=True)
 					newRemoteFolder = posixpath.join(remoteFolderParam, filename)
 					recursive_copy(newRemoteFolder, newLocalFolder)
-				elif isFile(fileInfo):
+				elif isFile(fileInfo) and newestLocalDate <= fileInfo.st_mtime:
 					locPath = posixpath.join(localFolderParam, filename)
 					remPath = posixpath.join(remoteFolderParam, filename)
 					# if not os.path.exists(locPath) or modifiedDate(os.stat(locPath)) < modifiedDate(fileInfo):
 					if not os.path.exists(locPath):
-						print(os.path.relpath(remPath, remoteFolder))
+						print(clr(os.path.relpath(remPath, remoteFolder), "green"))
 						sftp.get(remPath, locPath)
 						if preserveTimes:
 							os.utime(locPath, (fileInfo.st_atime, fileInfo.st_mtime))
-					# else:
-					# 	print(os.path.relpath(remPath, remoteFolder), "exists. Skipping...")
+					elif verbose:
+						print(f"{relPath} - skipping because it exists")
+				elif verbose:
+					if not isDir(fileInfo) and not isFile(fileInfo):
+						print(f"{relPath} - skipping because it is not a file nor folder")
+					elif not recursive and isDir(fileInfo):
+						print(f"{relPath} - skipping because folder recursion is disabled")
+					elif isFile(fileInfo) and not (newestLocalDate <= fileInfo.st_mtime):
+						print(f"{relPath} - skipping because it ({datetime.fromtimestamp(fileInfo.st_mtime)}) isn't newer than newestLocalDate")
+					else:
+						print(f"{relPath} - skipping because unknown reason")
+			elif verbose:
+				print(f'{relPath} - skipping because {"fileMatch returned False" if not fileMatch(filename) else f"it is older than {datetime.fromtimestamp(newerThanDate)}"}')
 
 	print(f"Local folder: {localFolder}")
 	print(f"Remote folder: {remoteFolder}")
