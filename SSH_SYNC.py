@@ -1,4 +1,4 @@
-# Version: 1.1.0
+# Version: 1.1.1
 
 from termcolor import colored as clr
 import os
@@ -9,6 +9,7 @@ from fnmatch import fnmatchcase
 import sys
 from datetime import datetime
 import posixpath
+from typing import Callable, Tuple
 
 start = time.time()
 
@@ -87,106 +88,64 @@ dateFormats = [
 	"%Y-%m-%d %H:%M",
 	"%Y-%m-%d %H:%M:%S",
 ]
+def preProcessFilesOrFolders(strName: str, paramName: str, newerThan: str, include: list[str], exclude: list[str]) -> Tuple[int, Callable[[int], str]]:
+	newerThanDate = 0
+	if newerThan:
+		for format in dateFormats:
+			try:
+				newerThanDate = datetime.strptime(newerThan, format).timestamp()
+				break
+			except ValueError:
+				pass
+		if not newerThanDate:
+			raise SimpleError(f'Incorrect {paramName} parameter: {newerThan}')
 
-filesNewerThanDate = 0
-if filesNewerThan:
-	for format in dateFormats:
-		try:
-			filesNewerThanDate = datetime.strptime(filesNewerThan, format).timestamp()
-			break
-		except ValueError:
-			pass
-	if not filesNewerThanDate:
-		raise SimpleError(f'Incorrect -n/--files-newer-than parameter: {filesNewerThan}')
+	if verbose:
+		print(f'Correctly parsed {paramName} parameter "{newerThan}" as {datetime.fromtimestamp(newerThanDate)}')
 
-if verbose:
-	print(f'Correctly parsed -n/--files-newer-than parameter "{filesNewerThan}" as {datetime.fromtimestamp(filesNewerThanDate)}')
+	defaultMatch = True
+	if include or exclude:
+		iIdx1 = iIdx2 = eIdx1 = eIdx2 = 10**10
 
-foldersNewerThanDate = 0
-if foldersNewerThan:
-	for format in dateFormats:
-		try:
-			foldersNewerThanDate = datetime.strptime(foldersNewerThan, format).timestamp()
-			break
-		except ValueError:
-			pass
-	if not foldersNewerThanDate:
-		raise SimpleError(f'Incorrect -f/--folders-newer-than parameter: {foldersNewerThan}')
+		if include:
+			try:
+				iIdx1 = sys.argv.index("-i")
+			except ValueError: pass
+			try:
+				iIdx2 = sys.argv.index("--include-files")
+			except ValueError: pass
+		includePos = min(iIdx1, iIdx2)
 
-if verbose:
-	print(f'Correctly parsed -f/--folders-newer-than parameter "{foldersNewerThan}" as {datetime.fromtimestamp(foldersNewerThanDate)}')
+		if exclude:
+			try:
+				eIdx1 = sys.argv.index("-e")
+			except ValueError: pass
+			try:
+				eIdx2 = sys.argv.index("--exclude-files")
+			except ValueError: pass
+		excludePos = min(eIdx1, eIdx2)
 
-defaultFileMatch = True
-if includeFiles and excludeFiles:
-	iIdx1 = iIdx2 = eIdx1 = eIdx2 = 10**10
-	try:
-		iIdx1 = sys.argv.index("-i")
-	except ValueError: pass
-	try:
-		iIdx2 = sys.argv.index("--include-files")
-	except ValueError: pass
-	includePos = min(iIdx1, iIdx2)
+		# if exclude was first - match everything by default, if include was first - match nothing by default
+		defaultMatch = excludePos < includePos
 
-	try:
-		eIdx1 = sys.argv.index("-e")
-	except ValueError: pass
-	try:
-		eIdx2 = sys.argv.index("--exclude-files")
-	except ValueError: pass
-	excludePos = min(eIdx1, eIdx2)
+	if verbose:
+		print(f'By default all {strName}s will be {"included" if defaultMatch else "exluded"}')
 
-	# if exclude was first - match everything by default, if include was first - match nothing by default
-	defaultFileMatch = excludePos < includePos
+	def match(name: str) -> bool:
+		for pattern in include:
+			if fnmatchcase(name, pattern):
+				return True
 
-if verbose:
-	print(f'By default all files will be {"included" if defaultFileMatch else "exluded"}')
+		for pattern in exclude:
+			if fnmatchcase(name, pattern):
+				return False
 
-def fileMatch(filename: str):
-	for pattern in includeFiles:
-		if fnmatchcase(filename, pattern):
-			return True
+		return defaultMatch
 
-	for pattern in excludeFiles:
-		if fnmatchcase(filename, pattern):
-			return False
+	return newerThanDate, match
 
-	return defaultFileMatch
-
-defaultFolderMatch = True
-if includeFolders and excludeFolders:
-	iIdx1 = iIdx2 = eIdx1 = eIdx2 = 10**10
-	try:
-		iIdx1 = sys.argv.index("-I")
-	except ValueError: pass
-	try:
-		iIdx2 = sys.argv.index("--include-folders")
-	except ValueError: pass
-	includePos = min(iIdx1, iIdx2)
-
-	try:
-		eIdx1 = sys.argv.index("-E")
-	except ValueError: pass
-	try:
-		eIdx2 = sys.argv.index("--exclude-folders")
-	except ValueError: pass
-	excludePos = min(eIdx1, eIdx2)
-
-	# if exclude was first - match everything by default, if include was first - match nothing by default
-	defaultFolderMatch = excludePos < includePos
-
-if verbose:
-	print(f'By default all folders will be {"included" if defaultFolderMatch else "exluded"}')
-
-def folderMatch(foldername: str):
-	for pattern in includeFolders:
-		if fnmatchcase(foldername, pattern):
-			return True
-
-	for pattern in excludeFolders:
-		if fnmatchcase(foldername, pattern):
-			return False
-
-	return defaultFolderMatch
+filesNewerThanDate  , fileMatch   = preProcessFilesOrFolders("file"  , "-n/--files-newer-than"  , filesNewerThan  , includeFiles  , excludeFiles  )
+foldersNewerThanDate, folderMatch = preProcessFilesOrFolders("folder", "-f/--folders-newer-than", foldersNewerThan, includeFolders, excludeFolders)
 
 ssh = getSSH(username, hostname, password, timeout, port, silent)
 sftp = ssh.open_sftp()
