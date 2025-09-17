@@ -5,7 +5,7 @@ import posixpath
 import argparse
 
 from SimpleError import SimpleError
-from getSSH import getSSH
+from sshUtils import getSSH
 from getPlatform import WINDOWS
 
 TITLE = "SSH GET"

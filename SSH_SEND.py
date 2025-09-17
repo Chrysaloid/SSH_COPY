@@ -7,7 +7,7 @@ import time
 start = time.time()
 
 from SimpleError import SimpleError
-from getSSH import getSSH
+from sshUtils import getSSH
 from getPlatform import WINDOWS
 from fileUtils import isFile, isDir, assertRemoteFolderExists
 

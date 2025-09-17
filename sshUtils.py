@@ -36,3 +36,47 @@ def getSSH(username: str, hostname: str, password: str, TIMEOUT: float = 1, port
 		raise SimpleError(errorMessage)
 
 	return ssh
+
+def remoteIsWindows(ssh: paramiko.SSHClient) -> bool:
+	try:
+		banner = ssh.get_transport().remote_version.lower()
+		if "windows" in banner:
+			return True
+	except Exception:
+		pass
+
+	try:
+		stdin, stdout, stderr = ssh.exec_command("uname -s")
+		out = stdout.read().decode(errors="ignore").strip().lower()
+		if out:
+			if out.startswith(("linux", "darwin", "freebsd", "netbsd", "openbsd")):
+				return False
+			if out.startswith(("msys_nt", "cygwin_nt", "mingw")):
+				return True
+			# Unexpected uname string -> treat as non-Windows
+			return False
+	except Exception:
+		pass
+
+	# Fallback: try cmd.exe (may also work in WSL, so only used if uname absent)
+	try:
+		stdin, stdout, stderr = ssh.exec_command("cmd.exe /c echo %OS%")
+		out = stdout.read().decode(errors="ignore").strip().lower()
+		if out.startswith("windows"):
+			return True
+	except Exception:
+		pass
+
+	raise SimpleError(f'Could not determine if remote is Windows due to errors') # Should not happen?
+
+def isFolderCaseSensitive(ssh: paramiko.SSHClient, pathToFolder: str) -> bool:
+	stdin, stdout, stderr = ssh.exec_command(f'fsutil.exe file queryCaseSensitiveInfo "{pathToFolder}" 2>&1')
+	output = stdout.read().decode(errors="ignore")
+	outputProcessed = output.strip().lower()
+
+	if outputProcessed.endswith("enabled."):
+		return True
+	if outputProcessed.endswith("disabled."):
+		return False
+
+	raise RuntimeError(f"Unexpected fsutil output:\n{output}")
