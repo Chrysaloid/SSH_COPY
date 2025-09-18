@@ -7,9 +7,9 @@ import time
 start = time.time()
 
 from SimpleError import SimpleError
-from sshUtils import getSSH
+from sshUtils import getSSH, assertRemoteFolderExists
 from getPlatform import WINDOWS
-from fileUtils import isFile, isDir, assertRemoteFolderExists
+from fileUtils import isFile, isDir
 
 TITLE = "SSH SEND"
 

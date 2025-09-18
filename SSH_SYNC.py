@@ -1,4 +1,4 @@
-# Version: 2.0.0
+# Version: 2.0.1
 
 from termcolor import colored as clr, cprint
 import os
@@ -11,17 +11,17 @@ from datetime import datetime
 import posixpath
 from typing import Callable, Tuple
 import shutil
-import subprocess
 from collections import defaultdict
 from itertools import chain
 
 start = time.time()
 
 from SimpleError import SimpleError
-from sshUtils import getSSH, remoteIsWindows, isFolderCaseSensitive
+from sshUtils import getSSH, remoteIsWindows, isFolderCaseSensitive as isRemoteFolderCaseSensitive, assertRemoteFolderExists
 from getPlatform import WINDOWS
-from fileUtils import isFile, isDir, assertRemoteFolderExists, modifiedDate
+from fileUtils import isFile, isDir, modifiedDate
 from LocalSFTPAttributes import local_listdir_attr
+from isFolderCaseSensitive import isFolderCaseSensitive as isLocalFolderCaseSensitive
 
 TITLE = "SSH SYNC"
 
@@ -219,7 +219,7 @@ if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 
 		copyFun = sftp.put
 		SOURCE_IS_NOT_WINDOWS_AND_DEST_IS_WINDOWS = not WINDOWS and remoteIsWindows(ssh)
-		def isDestFolderCaseSensitive(destFolderParam): return isFolderCaseSensitive(ssh, destFolderParam) # Only for Windows
+		def isDestFolderCaseSensitive(destFolderParam): return isRemoteFolderCaseSensitive(ssh, destFolderParam) # Only for Windows
 	else:
 		sourceFolderIter = sftp.listdir_attr
 		destFolderIter = local_listdir_attr
@@ -232,26 +232,7 @@ if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 
 		copyFun = sftp.get
 		SOURCE_IS_NOT_WINDOWS_AND_DEST_IS_WINDOWS = not remoteIsWindows(ssh) and WINDOWS
-		def isDestFolderCaseSensitive(destFolderParam): # Only for Windows
-			try:
-				result = subprocess.run(
-					f'fsutil file queryCaseSensitiveInfo "{destFolderParam}" 2>&1',
-					shell=True,
-					capture_output=True,
-					text=True,
-					check=False
-				)
-				output = result.stdout
-				outputProcessed = output.strip().lower()
-
-				if outputProcessed.endswith("enabled."):
-					return True
-				if outputProcessed.endswith("disabled."):
-					return False
-
-				raise RuntimeError(f"Unexpected fsutil output:\n{output}")
-			except FileNotFoundError:
-				raise RuntimeError("fsutil not found. This script must run on Windows with fsutil available.")
+		isDestFolderCaseSensitive = isLocalFolderCaseSensitive # Only for Windows
 else: # remoteFolder ACTUALLY refers to a LOCAL folder
 	if not os.path.isdir(remoteFolder):
 		raise SimpleError(f'Folder "{remoteFolder}" does not exist or is not a folder')

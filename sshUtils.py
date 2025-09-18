@@ -1,4 +1,4 @@
-from termcolor import colored as clr, cprint
+from termcolor import colored as clr
 import socket
 import paramiko
 from paramiko.ssh_exception import (
@@ -9,6 +9,7 @@ from paramiko.ssh_exception import (
 	PartialAuthentication,
 )
 from SimpleError import SimpleError
+from fileUtils import isDir
 
 def getSSH(username: str, hostname: str, password: str, TIMEOUT: float = 1, port = 22, silent = False):
 	ssh = paramiko.SSHClient()
@@ -67,10 +68,10 @@ def remoteIsWindows(ssh: paramiko.SSHClient) -> bool:
 	except Exception:
 		pass
 
-	raise SimpleError(f'Could not determine if remote is Windows due to errors') # Should not happen?
+	raise SimpleError(f"Could not determine if remote is Windows due to errors") # Should not happen?
 
 def isFolderCaseSensitive(ssh: paramiko.SSHClient, pathToFolder: str) -> bool:
-	stdin, stdout, stderr = ssh.exec_command(f'fsutil.exe file queryCaseSensitiveInfo "{pathToFolder}" 2>&1')
+	stdin, stdout, stderr = ssh.exec_command(f'C:/Windows/System32/fsutil.exe file queryCaseSensitiveInfo "{pathToFolder}" 2>&1')
 	output = stdout.read().decode(errors="ignore")
 	outputProcessed = output.strip().lower()
 
@@ -80,3 +81,14 @@ def isFolderCaseSensitive(ssh: paramiko.SSHClient, pathToFolder: str) -> bool:
 		return False
 
 	raise RuntimeError(f"Unexpected fsutil output:\n{output}")
+
+def remoteFolderExists(sftp: paramiko.SFTPClient, remotePath: str) -> bool:
+	try:
+		fileInfo = sftp.stat(remotePath) # Raises FileNotFoundError if it doesn't exist
+		return isDir(fileInfo)
+	except FileNotFoundError:
+		return False
+
+def assertRemoteFolderExists(sftp: paramiko.SFTPClient, remotePath: str):
+	if not remoteFolderExists(sftp, remotePath):
+		raise SimpleError(f'The remote folder "{remotePath}" does not exist or is not a folder')
