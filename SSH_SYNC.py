@@ -1,11 +1,11 @@
-# Version: 2.0.1
+# Version: 2.1.0
 
 from termcolor import colored as clr, cprint
 import os
 import paramiko
 import argparse
 import time
-from fnmatch import fnmatchcase
+from fnmatch import fnmatchcase, fnmatch
 import sys
 from datetime import datetime
 import posixpath
@@ -37,51 +37,86 @@ parser = argparse.ArgumentParser(description="Parse sync details")
 parser.add_argument("-l", "--local-folder" , required=True, help="Local folder's absolute path", dest="localFolder")
 parser.add_argument("-r", "--remote-folder", required=True, help="Remote (or local) folder's absolute path", dest="remoteFolder")
 
-parser.add_argument("-u", "--username"                 , default=""                            , help="Remote username")
-parser.add_argument("-H", "--hostname"                 , default=""                            , help="Remote host's address")
-parser.add_argument("-p", "--password"                 , default=""                            , help="Remote password")
-parser.add_argument("-i", "--include-files"            , default=[], action="extend", nargs="*", help="Glob patterns for files to include in copy/sync", dest="includeFiles")
-parser.add_argument("-e", "--exclude-files"            , default=[], action="extend", nargs="*", help="Glob patterns for files to exclude in copy/sync", dest="excludeFiles")
-parser.add_argument("-I", "--include-folders"          , default=[], action="extend", nargs="*", help="Glob patterns for folders to include in copy/sync", dest="includeFolders")
-parser.add_argument("-E", "--exclude-folders"          , default=[], action="extend", nargs="*", help="Glob patterns for folders to exclude in copy/sync", dest="excludeFolders")
-parser.add_argument("-n", "--files-newer-than"         , default=""                            , help="Copy/Sync only files newer then this date", dest="filesNewerThan")
-parser.add_argument("-f", "--folders-newer-than"       , default=""                            , help="Copy/Sync only folders newer then this date", dest="foldersNewerThan")
-parser.add_argument("-F", "--force"                    , action="store_true"                   , help="Force copying of source files even if they are older then destination files", dest="force")
-parser.add_argument("-N", "--newer-than-newest-file"   , action="store_true"                   , help="Copy only files newer then the newest file in the destination folder", dest="newerThanNewestFile")
-parser.add_argument("-M", "--newer-than-newest-folder" , action="store_true"                   , help="Copy only files newer then the newest folder in the destination folder", dest="newerThanNewestFolder")
-parser.add_argument("-D", "--dont-filter-dest"         , action="store_false"                  , help="Don't filter the destination files/folders WHEN SEARCHING FOR THE NEWEST FILE", dest="filterDest")
-parser.add_argument("-R", "--recursive"                , default=0, nargs="?", type=int        , help="Recurse into subdirectories. Optionaly take max recursion depth as parameter", dest="maxRecursionDepth")
-parser.add_argument("-v", "--verbose"                  , action="store_true"                   , help="Print verbose information. Good for debugging")
-parser.add_argument("-s", "--silent"                   , action="store_true"                   , help="Print only errors")
-parser.add_argument("-P", "--port"                     , default=22, type=int                  , help="Remote port (default: 22)")
-parser.add_argument("-T", "--timeout"                  , default=1, type=float                 , help="TCP 3-way handshake timeout in seconds (default: 1)")
-parser.add_argument("-t", "--preserve-times"           , action="store_true"                   , help="If set, modification times will be preserved", dest="preserveTimes")
-parser.add_argument("-d", "--dont-close"               , action="store_true"                   , help="Don't auto-close console window at the end if no error occurred. You will have to close it manually or by pressing ENTER", dest="dontClose")
+class Filter:
+	def __init__(self, pattern: str, matchVal: bool, matchingFunc: Callable):
+		self.pattern = pattern
+		self.matchVal = matchVal
+		self.matchingFunc = matchingFunc
+
+class IncludeExcludeAction(argparse.Action):
+	destDefaults = {}
+
+	def __init__(self, option_strings: list[str], dest, **kwargs):
+		super().__init__(option_strings, dest, **kwargs)
+
+		if len(option_strings) != 2:
+			raise ValueError(f"IncludeExcludeAction should always have short and long parameter names specified")
+
+		longName = max(option_strings, key=lambda op: len(op))
+
+		self.matchVal = longName.startswith("--include")
+		self.matchingFunc = fnmatchcase if longName.endswith("case") else fnmatch
+
+	def __call__(self, parser, namespace, values, option_string=None):
+		# Ensure the target list exists
+		items = getattr(namespace, self.dest, None)
+		if items is None:
+			items = []
+			setattr(namespace, self.dest, items)
+
+		if self.dest not in IncludeExcludeAction.destDefaults:
+			IncludeExcludeAction.destDefaults[self.dest] = self.matchVal
+
+		for pattern in values:
+			items.append(Filter(pattern, self.matchVal, self.matchingFunc))
+
+parser.add_argument("-i", "--include-files"       , action=IncludeExcludeAction, nargs="*", help="Glob patterns for files to include in copy/sync"                   , dest="inExcludeFiles"  )
+parser.add_argument("-e", "--exclude-files"       , action=IncludeExcludeAction, nargs="*", help="Glob patterns for files to exclude in copy/sync"                   , dest="inExcludeFiles"  )
+parser.add_argument("-c", "--include-files-case"  , action=IncludeExcludeAction, nargs="*", help="Glob patterns for files to include in copy/sync (case-sensitive)"  , dest="inExcludeFiles"  )
+parser.add_argument("-a", "--exclude-files-case"  , action=IncludeExcludeAction, nargs="*", help="Glob patterns for files to exclude in copy/sync (case-sensitive)"  , dest="inExcludeFiles"  )
+parser.add_argument("-I", "--include-folders"     , action=IncludeExcludeAction, nargs="*", help="Glob patterns for folders to include in copy/sync"                 , dest="inExcludeFolders")
+parser.add_argument("-E", "--exclude-folders"     , action=IncludeExcludeAction, nargs="*", help="Glob patterns for folders to exclude in copy/sync"                 , dest="inExcludeFolders")
+parser.add_argument("-C", "--include-folders-case", action=IncludeExcludeAction, nargs="*", help="Glob patterns for folders to include in copy/sync (case-sensitive)", dest="inExcludeFolders")
+parser.add_argument("-A", "--exclude-folders-case", action=IncludeExcludeAction, nargs="*", help="Glob patterns for folders to exclude in copy/sync (case-sensitive)", dest="inExcludeFolders")
+parser.add_argument("-u", "--username"                 , default=""                    , help="Remote username")
+parser.add_argument("-H", "--hostname"                 , default=""                    , help="Remote host's address")
+parser.add_argument("-p", "--password"                 , default=""                    , help="Remote password")
+parser.add_argument("-n", "--files-newer-than"         , default=""                    , help="Copy/Sync only files newer then this date", dest="filesNewerThan")
+parser.add_argument("-f", "--folders-newer-than"       , default=""                    , help="Copy/Sync only folders newer then this date", dest="foldersNewerThan")
+parser.add_argument("-F", "--force"                    , action="store_true"           , help="Force copying of source files even if they are older then destination files", dest="force")
+parser.add_argument("-N", "--newer-than-newest-file"   , action="store_true"           , help="Copy only files newer then the newest file in the destination folder", dest="newerThanNewestFile")
+parser.add_argument("-M", "--newer-than-newest-folder" , action="store_true"           , help="Copy only files newer then the newest folder in the destination folder", dest="newerThanNewestFolder")
+parser.add_argument("-D", "--dont-filter-dest"         , action="store_false"          , help="Don't filter the destination files/folders WHEN SEARCHING FOR THE NEWEST FILE", dest="filterDest")
+parser.add_argument("-R", "--recursive"                , default=0, nargs="?", type=int, help="Recurse into subdirectories. Optionaly takes max recursion depth as parameter", dest="maxRecursionDepth")
+parser.add_argument("-v", "--verbose"                  , action="store_true"           , help="Print verbose information. Good for debugging")
+parser.add_argument("-s", "--silent"                   , action="store_true"           , help="Print only errors")
+parser.add_argument("-P", "--port"                     , default=22, type=int          , help="Remote port (default: 22)")
+parser.add_argument("-T", "--timeout"                  , default=1, type=float         , help="TCP 3-way handshake timeout in seconds (default: 1)")
+parser.add_argument("-t", "--preserve-times"           , action="store_true"           , help="If set, modification times will be preserved", dest="preserveTimes")
+parser.add_argument("-d", "--dont-close"               , action="store_true"           , help="Don't auto-close console window at the end if no error occurred. You will have to close it manually or by pressing ENTER", dest="dontClose")
 
 args = parser.parse_args()
 
-username              : str         = args.username
-hostname              : str         = args.hostname
-password              : str         = args.password
-localFolder           : str         = args.localFolder
-remoteFolder          : str         = args.remoteFolder
-includeFiles          : list  [str] = args.includeFiles
-excludeFiles          : list  [str] = args.excludeFiles
-includeFolders        : list  [str] = args.includeFolders
-excludeFolders        : list  [str] = args.excludeFolders
-force                 : bool        = args.force
-newerThanNewestFile   : bool        = args.newerThanNewestFile
-newerThanNewestFolder : bool        = args.newerThanNewestFolder
-filterDest            : bool        = args.filterDest
-maxRecursionDepth     : int         = args.maxRecursionDepth
-verbose               : bool        = args.verbose
-silent                : bool        = args.silent
-filesNewerThan        : str         = args.filesNewerThan
-foldersNewerThan      : str         = args.foldersNewerThan
-port                  : int         = args.port
-timeout               : float       = args.timeout
-preserveTimes         : bool        = args.preserveTimes
-dontClose             : bool        = args.dontClose
+username              : str            = args.username
+hostname              : str            = args.hostname
+password              : str            = args.password
+localFolder           : str            = args.localFolder
+remoteFolder          : str            = args.remoteFolder
+inExcludeFiles        : list  [Filter] = args.inExcludeFiles
+inExcludeFolders      : list  [Filter] = args.inExcludeFolders
+force                 : bool           = args.force
+newerThanNewestFile   : bool           = args.newerThanNewestFile
+newerThanNewestFolder : bool           = args.newerThanNewestFolder
+filterDest            : bool           = args.filterDest
+maxRecursionDepth     : int            = args.maxRecursionDepth
+verbose               : bool           = args.verbose
+silent                : bool           = args.silent
+filesNewerThan        : str            = args.filesNewerThan
+foldersNewerThan      : str            = args.foldersNewerThan
+port                  : int            = args.port
+timeout               : float          = args.timeout
+preserveTimes         : bool           = args.preserveTimes
+dontClose             : bool           = args.dontClose
 
 if maxRecursionDepth is None: # Argument with no parameter mean no recursion limit
 	maxRecursionDepth = sys.maxsize
@@ -111,12 +146,10 @@ dateFormats = [
 ]
 def preProcessFilesOrFolders(
 		strName: str,
-		includeParamNames: tuple[str],
-		excludeParamNames: tuple[str],
+		strParam: str,
 		newerThanParamName: str,
 		newerThan: str,
-		include: list[str],
-		exclude: list[str]
+		inExclude: list[Filter]
 	) -> Tuple[int, Callable[[int], str]]:
 	newerThanDate = 0
 	if newerThan:
@@ -132,47 +165,25 @@ def preProcessFilesOrFolders(
 	if verbose:
 		print(f'Correctly parsed {newerThanParamName} parameter "{newerThan}" as {datetime.fromtimestamp(newerThanDate)}')
 
-	defaultMatch = True
-	if include or exclude:
-		includePos = excludePos = 10**10
-
-		if include:
-			for name in includeParamNames:
-				try:
-					idx = sys.argv.index(name)
-					if includePos > idx:
-						includePos = idx
-				except ValueError: pass
-
-		if exclude:
-			for name in excludeParamNames:
-				try:
-					idx = sys.argv.index(name)
-					if excludePos > idx:
-						excludePos = idx
-				except ValueError: pass
-
-		# if exclude was first - match everything by default, if include was first - match nothing by default
-		defaultMatch = excludePos < includePos
+	defaultMatch = IncludeExcludeAction.destDefaults.get(strParam, True)
 
 	if verbose:
 		print(f'By default all {strName}s will be {"included" if defaultMatch else "exluded"}')
 
-	def match(name: str) -> bool:
-		for pattern in include:
-			if fnmatchcase(name, pattern):
-				return True
-
-		for pattern in exclude:
-			if fnmatchcase(name, pattern):
-				return False
-
-		return defaultMatch
+	if inExclude:
+		def match(name: str) -> bool:
+			for filterObj in inExclude:
+				if filterObj.matchingFunc(name, filterObj.pattern):
+					return filterObj.matchVal
+			return defaultMatch
+	else:
+		def match(name: str) -> bool:
+			return defaultMatch
 
 	return newerThanDate, match
 
-filesNewerThanDate  , fileMatch   = preProcessFilesOrFolders("file"  , ("-i", "--include-files")  , ("-e", "--exclude-files")  , "-n/--files-newer-than"  , filesNewerThan  , includeFiles  , excludeFiles  )
-foldersNewerThanDate, folderMatch = preProcessFilesOrFolders("folder", ("-I", "--include-folders"), ("-E", "--exclude-folders"), "-f/--folders-newer-than", foldersNewerThan, includeFolders, excludeFolders)
+filesNewerThanDate  , fileMatch   = preProcessFilesOrFolders("file"  , "inExcludeFiles"  , "-n/--files-newer-than"  , filesNewerThan  , inExcludeFiles  )
+foldersNewerThanDate, folderMatch = preProcessFilesOrFolders("folder", "inExcludeFolders", "-f/--folders-newer-than", foldersNewerThan, inExcludeFolders)
 
 try:
 	localIdx = sys.argv.index("-l")
