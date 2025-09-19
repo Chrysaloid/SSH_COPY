@@ -1,4 +1,4 @@
-# Version: 2.1.0
+# Version: 2.2.0
 
 from termcolor import colored as clr, cprint
 import os
@@ -92,7 +92,7 @@ parser.add_argument("-v", "--verbose"                  , action="store_true"    
 parser.add_argument("-s", "--silent"                   , action="store_true"           , help="Print only errors")
 parser.add_argument("-P", "--port"                     , default=22, type=int          , help="Remote port (default: 22)")
 parser.add_argument("-T", "--timeout"                  , default=1, type=float         , help="TCP 3-way handshake timeout in seconds (default: 1)")
-parser.add_argument("-t", "--preserve-times"           , action="store_true"           , help="If set, modification times will be preserved", dest="preserveTimes")
+parser.add_argument("-t", "--dont-preserve-times"      , action="store_false"          , help="If set, modification times will not be preserved", dest="preserveTimes")
 parser.add_argument("-d", "--dont-close"               , action="store_true"           , help="Don't auto-close console window at the end if no error occurred. You will have to close it manually or by pressing ENTER", dest="dontClose")
 
 args = parser.parse_args()
