@@ -9,7 +9,7 @@ from paramiko.ssh_exception import (
 	PartialAuthentication,
 )
 from SimpleError import SimpleError
-from fileUtils import isDir
+from fileUtils import isDir, iteratePathParts
 
 def getSSH(username: str, hostname: str, password: str, TIMEOUT: float = 1, port = 22, silent = False):
 	ssh = paramiko.SSHClient()
@@ -89,6 +89,19 @@ def remoteFolderExists(sftp: paramiko.SFTPClient, remotePath: str) -> bool:
 	except FileNotFoundError:
 		return False
 
-def assertRemoteFolderExists(sftp: paramiko.SFTPClient, remotePath: str):
+def assertRemoteFolderExists(sftp: paramiko.SFTPClient, remotePath: str, additionalComment = ""):
 	if not remoteFolderExists(sftp, remotePath):
-		raise SimpleError(f'The remote folder "{remotePath}" does not exist or is not a folder')
+		raise SimpleError(f'The remote folder "{remotePath}" does not exist or is not a folder{additionalComment}')
+
+def remoteMkdir(sftp: paramiko.SFTPClient, remotePath: str):
+	""" Returns True if folder was created and False if it already exists """
+	try:
+		sftp.mkdir(remotePath)
+		return True
+	except IOError:
+		return False
+
+def ensureRemoteFolderExists(sftp: paramiko.SFTPClient, remotePath: str):
+	if not remoteFolderExists(sftp, remotePath):
+		for part in iteratePathParts(remotePath):
+			remoteMkdir(sftp, part)
