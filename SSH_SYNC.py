@@ -1,4 +1,4 @@
-# Version: 2.3.0
+# Version: 2.3.1
 
 # region #* IMPORTS
 from termcolor import colored as clr, cprint
@@ -331,7 +331,7 @@ DEST_FILTER_WARN = verbose and filterDest and any(filter(lambda f: f.matchingFun
 # region #* FILE COPYING
 def innerFilterFun(entry: paramiko.SFTPAttributes) -> bool:
 	return isDir (entry) and foldersNewerThanDate <= entry.st_mtime and folderMatch(entry.filename) \
-		 or isFile(entry) and filesNewerThanDate   <= entry.st_mtime and fileMatch  (entry.filename)
+		or isFile(entry) and filesNewerThanDate   <= entry.st_mtime and fileMatch  (entry.filename)
 
 def filterFun(entry: paramiko.SFTPAttributes):
 	val = innerFilterFun(entry)
@@ -462,27 +462,27 @@ def recursiveCopy(sourceFolderParam: str, destFolderParam: str, depth: int = 0):
 		case _: # Shouldn't happen
 			raise SimpleError(f"Invalid mode: {mode}")
 
-try:
-	if not silent:
-		print(f"Copying from {SOURCE_DESIGNATION} to {DEST_DESIGNATION}")
-		print(f"Source folder: {sourceFolder}")
-		print(f"Destination folder: {destFolder}")
-		print("Copying files:\n")
+if not silent:
+	print(f"Copying from {SOURCE_DESIGNATION} to {DEST_DESIGNATION}")
+	print(f"Source folder: {sourceFolder}")
+	print(f"Destination folder: {destFolder}")
+	print("Copying files:\n")
 
-	recursiveCopy(sourceFolder, destFolder, 0)
+recursiveCopy(sourceFolder, destFolder, 0)
 
-	if not silent:
-		print(f"\nExecution time: {time.time() - start:.3f} s")
+# the try...finally block is not needed because when an exception happens "the program ends, the
+# Python process shuts down. As part of process teardown, the underlying socket to the SSH server is
+# closed by the OS"
+if REMOTE_IS_REMOTE:
+	sftp.close()
+	ssh.close()
 
-	if dontClose:
-		if silent:
-			input("")
-		else:
-			input(clr("\nPress ENTER to continue...", "green"))
-except SimpleError as e:
-	raise e
-finally:
-	if REMOTE_IS_REMOTE:
-		sftp.close()
-		ssh.close()
+if not silent:
+	print(f"\nExecution time: {time.time() - start:.3f} s")
+
+if dontClose:
+	if silent:
+		input("")
+	else:
+		input(clr("\nPress ENTER to continue...", "green"))
 # endregion
