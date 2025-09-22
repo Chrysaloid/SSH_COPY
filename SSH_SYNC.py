@@ -1,4 +1,4 @@
-# Version: 2.3.1
+# Version: 2.4.0
 
 # region #* IMPORTS
 from termcolor import colored as clr, cprint
@@ -19,7 +19,16 @@ from enum import IntEnum, auto
 start = time.time()
 
 from SimpleError import SimpleError
-from sshUtils import getSSH, remoteIsWindows, isFolderCaseSensitive as isRemoteFolderCaseSensitive, assertRemoteFolderExists, remoteMkdir as remoteMkdirBase, ensureRemoteFolderExists
+from sshUtils import (
+	getSSH,
+	remoteIsWindows,
+	isFolderCaseSensitive as isRemoteFolderCaseSensitive,
+	assertRemoteFolderExists,
+	remoteMkdir as remoteMkdirBase,
+	remote_listdir_attr as remote_listdir_attr_base,
+	remoteHasPython,
+	ensureRemoteFolderExists
+)
 from getPlatform import WINDOWS
 from fileUtils import isFile, isDir, modifiedDate, assertFolderExists, ensureFolderExists, mkdir as localMkdir
 from LocalSFTPAttributes import local_listdir_attr
@@ -114,6 +123,7 @@ parser.add_argument("-t", "--dont-preserve-times"      , action="store_false"   
 parser.add_argument("-d", "--dont-close"               , action="store_true"           , help="Don't auto-close console window at the end if no error occurred. You will have to close it manually or by pressing ENTER", dest="dontClose")
 parser.add_argument("-m", "--mode"                     , default="COPY"                , help=f'One of values: {",".join(MODE_DICT.keys())} (Default: copy)')
 parser.add_argument("-S", "--create-dest-folder"       , action="store_true"           , help="If destination folder doesn't exists, create it and all its parents (like mkdir (-p on Linux)). If not set throw an error if the folder doesn not exist", dest="createDestFolder")
+parser.add_argument("-l", "--fast-listdir-attr"        , action="store_true"           , help="If you copy/sync folder(s) containing more than 1000 entries this may be faster. Requires Python 3 on remote host", dest="fastListdirAttr")
 
 args = parser.parse_args()
 
@@ -140,6 +150,7 @@ preserveTimes         : bool               = args.preserveTimes
 dontClose             : bool               = args.dontClose
 mode                  : str                = args.mode
 createDestFolder      : bool               = args.createDestFolder
+fastListdirAttr       : bool               = args.fastListdirAttr
 # endregion
 
 # region #* PARAMETER VALIDATION
@@ -269,9 +280,15 @@ if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 
 	def remoteMkdir(path): return remoteMkdirBase(sftp, path)
 
+	if fastListdirAttr:
+		pythonStr = remoteHasPython(ssh)
+		def remote_listdir_attr(path: str): return remote_listdir_attr_base(ssh, path, pythonStr)
+	else:
+		remote_listdir_attr = sftp.listdir_attr
+
 	if LOCAL_IS_SOURCE:
 		sourceFolderIter = local_listdir_attr
-		destFolderIter = sftp.listdir_attr
+		destFolderIter = remote_listdir_attr
 
 		sourceMkdir = localMkdir
 		destMkdir = remoteMkdir
@@ -288,7 +305,7 @@ if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 		def isSourceFolderCaseSensitive(path: str): return isFolderCaseSensitiveBase(sourceIsWindows, isLocalFolderCaseSensitive, (path, False), "source", path)
 		def isDestFolderCaseSensitive(path: str): return isFolderCaseSensitiveBase(destIsWindows, isRemoteFolderCaseSensitive, (ssh, path), "destination", path)
 	else:
-		sourceFolderIter = sftp.listdir_attr
+		sourceFolderIter = remote_listdir_attr
 		destFolderIter = local_listdir_attr
 
 		sourceMkdir = remoteMkdir
