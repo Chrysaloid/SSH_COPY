@@ -3,11 +3,12 @@ import os
 import paramiko
 import argparse
 import time
+import posixpath
 
 start = time.time()
 
 from SimpleError import SimpleError
-from sshUtils import getSSH, assertRemoteFolderExists
+from sshUtils import getSSH, assertRemoteFolderExists, remoteMkdir
 from getPlatform import WINDOWS
 from fileUtils import isFile, isDir
 
@@ -55,36 +56,44 @@ selectedFiles = getSelectedFilesFromExplorer() if WINDOWS else getSelectedFilesF
 ssh = getSSH(username, hostname, password, timeout, port)
 sftp = ssh.open_sftp()
 
+remoteFolder = remoteFolder.replace("\\", "/")
 assertRemoteFolderExists(sftp, remoteFolder)
 
 totalFiles = 0
-baseFolder = os.path.dirname(selectedFiles[0])
-def sftpUpload(sftp: paramiko.SFTPClient, localPath: str, remotePath: str):
+baseFolder = posixpath.dirname(selectedFiles[0])
+def sftpUpload(sftp: paramiko.SFTPClient, localEntry: os.DirEntry, remotePath: str):
 	"""Upload file or folder recursively, printing relative paths."""
 	global totalFiles
-	fileInfo = os.stat(localPath)
-	if isFile(fileInfo):
-		print(os.path.relpath(localPath, baseFolder))
-		sftp.put(localPath, remotePath)
+	info = localEntry.stat(follow_symlinks=False)
+	if isFile(info):
+		print(posixpath.relpath(localEntry.path, baseFolder))
+		sftp.put(localEntry.path, remotePath)
 		if preserveTimes:
-			sftp.utime(remotePath, (fileInfo.st_atime, fileInfo.st_mtime))
+			sftp.utime(remotePath, (info.st_atime, info.st_mtime))
 		totalFiles += 1
-	elif isDir(fileInfo):
-		try:
-			sftp.mkdir(remotePath)
-		except IOError: pass # Directory may already exist
-		for item in os.listdir(localPath):
-			sftpUpload(sftp, os.path.join(localPath, item), os.path.join(remotePath, item).replace("\\", "/"))
+	elif isDir(info):
+		remoteMkdir(sftp, remotePath)
+		with os.scandir(localEntry.path) as dir:
+			for entry in dir:
+				sftpUpload(sftp, entry, posixpath.join(remotePath, entry.name))
+
+class LocalDirEntry:
+	def __init__(self, absPath: str):
+		self.path = absPath # os.path.abspath(absPath)
+		self.name = os.path.basename(absPath)
+
+	def stat(self, follow_symlinks=True):
+		return os.stat(self.path, follow_symlinks=follow_symlinks)
 
 print("Sending files:\n")
 for path in selectedFiles:
-	baseName = os.path.basename(path)
-	remoteTarget = os.path.join(remoteFolder, baseName).replace("\\", "/")
-	sftpUpload(sftp, path, remoteTarget)
+	entry = LocalDirEntry(path)
+	remoteTarget = posixpath.join(remoteFolder, entry.name)
+	sftpUpload(sftp, entry, remoteTarget)
 
 if zeroFile:
 	print("Sending 0 file")
-	with sftp.open(os.path.join(remoteFolder, "0").replace("\\", "/"), "w"):
+	with sftp.open(posixpath.join(remoteFolder, "0")):
 		pass
 
 sftp.close()

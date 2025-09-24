@@ -112,16 +112,18 @@ def remote_listdir_attr(ssh: paramiko.SSHClient, path: str, pythonStr = "python"
 	# import os
 	# with os.scandir('{path}') as d:
 	# 	for e in d:
-	# 		i = e.stat(follow_symlinks=False)
+	# 		i = e.stat(follow_symlinks=0)
 	# 		print(e.name, '%x/%x/%x/%x' % (i.st_mode, i.st_size, int(i.st_atime), int(i.st_mtime)), sep='/')
-	code = f"import os\\nwith os.scandir('{path}') as d:\\n\\tfor e in d:\\n\\t\\ti = e.stat(follow_symlinks=False)\\n\\t\\tprint(e.name, '%x/%x/%x/%x' % (i.st_mode, i.st_size, int(i.st_atime), int(i.st_mtime)), sep='/')"
+	code = f"import os\\nwith os.scandir('{path}') as d:\\n for e in d:\\n  i = e.stat(follow_symlinks=0)\\n  print(e.name, '%x/%x/%x/%x' % (i.st_mode, i.st_size, int(i.st_atime), int(i.st_mtime)), sep='/')"
 	stdin, stdout, stderr = ssh.exec_command(f'{pythonStr} -c "exec(\\\"{code}\\\")"')
 
+	out = stdout.read()
+
 	if stdout.channel.recv_exit_status() != 0:
-		raise SimpleError(f'remote_listdir_attr: Something went wrong when executing remote python script:\n{stderr.read().decode(errors="ignore").strip()}')
+		raise SimpleError(f'remote_listdir_attr: Something went wrong when executing remote python script:\n{stderr.read().decode(errors="ignore").strip() or out.decode(errors="ignore").strip()}')
 
 	entries = []
-	for entry in stdout.read().decode(errors="ignore").strip().splitlines():
+	for entry in out.decode(errors="ignore").splitlines():
 		filename, st_mode, st_size, st_atime, st_mtime = entry.split("/")
 		entries.append(LocalSFTPAttributes.from_values(
 			filename=filename,

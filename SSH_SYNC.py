@@ -1,5 +1,3 @@
-# Version: 2.4.0
-
 # region #* IMPORTS
 from termcolor import colored as clr, cprint
 import os
@@ -284,7 +282,7 @@ if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 		pythonStr = remoteHasPython(ssh)
 		def remote_listdir_attr(path: str): return remote_listdir_attr_base(ssh, path, pythonStr)
 	else:
-		remote_listdir_attr = sftp.listdir_attr
+		def remote_listdir_attr(path: str): return tuple(sftp.listdir_iter(path)) # this is faster than sftp.listdir_attr because listdir_iter is async
 
 	if LOCAL_IS_SOURCE:
 		sourceFolderIter = local_listdir_attr
@@ -419,7 +417,7 @@ def recursiveCopy(sourceFolderParam: str, destFolderParam: str, depth: int = 0):
 					if DEST_FILTER_WARN and not destCaseSense:
 						cprint("Warning: When searching for newest file in the destination folder you may have excluded some files/folders case-sensitivly but the folder is case-insensitive", "yellow")
 					entryCount = 0
-					for entry in (tuple(filter(innerFilterFun, destEntries)) if filterDest else destEntries):
+					for entry in (filter(innerFilterFun, destEntries) if filterDest else destEntries):
 						if newerThanNewestFile and isFile(entry) or newerThanNewestFolder and isDir(entry):
 							entryCount += 1
 							if newestDestDate < entry.st_mtime:
