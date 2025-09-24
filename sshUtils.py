@@ -107,32 +107,53 @@ def ensureRemoteFolderExists(sftp: paramiko.SFTPClient, remotePath: str):
 		for part in iteratePathParts(remotePath):
 			remoteMkdir(sftp, part)
 
-def remote_listdir_attr(ssh: paramiko.SSHClient, path: str, pythonStr = "python"):
-	""" Faster way to achieve the same as sftp.listdir_attr for large directories """
-	# import os
-	# with os.scandir('{path}') as d:
-	# 	for e in d:
-	# 		i = e.stat(follow_symlinks=0)
-	# 		print(e.name, '%x/%x/%x/%x' % (i.st_mode, i.st_size, int(i.st_atime), int(i.st_mtime)), sep='/')
-	code = f"import os\\nwith os.scandir('{path}') as d:\\n for e in d:\\n  i = e.stat(follow_symlinks=0)\\n  print(e.name, '%x/%x/%x/%x' % (i.st_mode, i.st_size, int(i.st_atime), int(i.st_mtime)), sep='/')"
-	stdin, stdout, stderr = ssh.exec_command(f'{pythonStr} -c "exec(\\\"{code}\\\")"')
+class RemoteListDir:
+	def __init__(self, ssh: paramiko.SSHClient, pythonStr = "python", init = False):
+		self.ssh = ssh
+		self.pythonStr = pythonStr
+		self.stdin: paramiko.ChannelFile | None = None
+		self.stdout: paramiko.ChannelFile | None = None
+		self.stderr: paramiko.ChannelFile | None = None
+		if init:
+			self.init()
 
-	out = stdout.read()
+	def init(self):
+		if self.stdin is None:
+			code = (
+				"import os\\n"
+				"while (s := input()):\\n"
+				" with os.scandir(s) as d:\\n"
+				"  for e in d:\\n"
+				"   i = e.stat(follow_symlinks=0); print(e.name, '%x/%x/%x/%x' % (i.st_mode, i.st_size, int(i.st_atime), int(i.st_mtime)), sep='/')\\n"
+				"  print('', flush=1)"
+			)
+			cmd = f'{self.pythonStr} -c "exec(\\\"{code}\\\")"'
+			self.stdin, self.stdout, self.stderr = self.ssh.exec_command(cmd)
 
-	if stdout.channel.recv_exit_status() != 0:
-		raise SimpleError(f'remote_listdir_attr: Something went wrong when executing remote python script:\n{stderr.read().decode(errors="ignore").strip() or out.decode(errors="ignore").strip()}')
+	def listdir_attr(self, path: str):
+		self.init()
 
-	entries = []
-	for entry in out.decode(errors="ignore").splitlines():
-		filename, st_mode, st_size, st_atime, st_mtime = entry.split("/")
-		entries.append(LocalSFTPAttributes.from_values(
-			filename=filename,
-			st_mode=int(st_mode, 16),
-			st_size=int(st_size, 16),
-			st_atime=int(st_atime, 16),
-			st_mtime=int(st_mtime, 16),
-		))
-	return entries
+		try:
+			self.stdin.write(path + "\n")
+			self.stdin.flush()
+		except OSError: # Socket is closed
+			raise SimpleError(
+				f'RemoteListDir.listdir_attr: remote script returned error when listing folder "{path}":\n{ \
+				self.stderr.read().decode(errors="ignore").strip() \
+				or self.stdout.read().decode(errors="ignore").strip()}'
+			)
+
+		entries = []
+		while (line := self.stdout.readline().rstrip()):
+			filename, st_mode, st_size, st_atime, st_mtime = line.split("/")
+			entries.append(LocalSFTPAttributes.from_values(
+				filename=filename,
+				st_mode=int(st_mode, 16),
+				st_size=int(st_size, 16),
+				st_atime=int(st_atime, 16),
+				st_mtime=int(st_mtime, 16),
+			))
+		return entries
 
 def remoteHasPython(ssh: paramiko.SSHClient, throwOnNotFound: bool = True) -> str:
 	""" Returns python alias that worked """

@@ -23,7 +23,7 @@ from sshUtils import (
 	isFolderCaseSensitive as isRemoteFolderCaseSensitive,
 	assertRemoteFolderExists,
 	remoteMkdir as remoteMkdirBase,
-	remote_listdir_attr as remote_listdir_attr_base,
+	RemoteListDir,
 	remoteHasPython,
 	ensureRemoteFolderExists
 )
@@ -121,7 +121,7 @@ parser.add_argument("-t", "--dont-preserve-times"      , action="store_false"   
 parser.add_argument("-d", "--dont-close"               , action="store_true"           , help="Don't auto-close console window at the end if no error occurred. You will have to close it manually or by pressing ENTER", dest="dontClose")
 parser.add_argument("-m", "--mode"                     , default="COPY"                , help=f'One of values: {",".join(MODE_DICT.keys())} (Default: copy)')
 parser.add_argument("-S", "--create-dest-folder"       , action="store_true"           , help="If destination folder doesn't exists, create it and all its parents (like mkdir (-p on Linux)). If not set throw an error if the folder doesn not exist", dest="createDestFolder")
-parser.add_argument("-l", "--fast-listdir-attr"        , action="store_true"           , help="If you copy/sync folder(s) containing more than 1000 entries this may be faster. Requires Python 3 on remote host", dest="fastListdirAttr")
+parser.add_argument("-l", "--fast-remote-listdir-attr" , action="store_true"           , help="If you copy/sync folder(s) containing more than 5000 entries from/to remote location this may be faster. Requires Python 3 on remote host", dest="fastRemoteListdirAttr")
 
 args = parser.parse_args()
 
@@ -148,7 +148,7 @@ preserveTimes         : bool               = args.preserveTimes
 dontClose             : bool               = args.dontClose
 mode                  : str                = args.mode
 createDestFolder      : bool               = args.createDestFolder
-fastListdirAttr       : bool               = args.fastListdirAttr
+fastRemoteListdirAttr : bool               = args.fastRemoteListdirAttr
 # endregion
 
 # region #* PARAMETER VALIDATION
@@ -278,11 +278,16 @@ if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 
 	def remoteMkdir(path): return remoteMkdirBase(sftp, path)
 
-	if fastListdirAttr:
+	if fastRemoteListdirAttr:
 		pythonStr = remoteHasPython(ssh)
-		def remote_listdir_attr(path: str): return remote_listdir_attr_base(ssh, path, pythonStr)
+		rld = RemoteListDir(ssh, pythonStr, init=False) # don't init the remote python script because remote_listdir_attr might not get called at all
+		remote_listdir_attr = rld.listdir_attr
 	else:
-		def remote_listdir_attr(path: str): return tuple(sftp.listdir_iter(path)) # this is faster than sftp.listdir_attr because listdir_iter is async
+		def remote_listdir_attr(path: str):
+			try:
+				return tuple(sftp.listdir_iter(path)) # this is faster than sftp.listdir_attr because listdir_iter is async
+			except PermissionError:
+				raise SimpleError(f'Permission denied when listing folder "{path}"')
 
 	if LOCAL_IS_SOURCE:
 		sourceFolderIter = local_listdir_attr
