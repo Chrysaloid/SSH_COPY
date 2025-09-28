@@ -122,10 +122,10 @@ class RemoteListDir:
 			code = (
 				"import os\\n"
 				"while (s := input()):\\n"
-				" with os.scandir(s) as d:\\n"
-				"  for e in d:\\n"
-				"   i = e.stat(follow_symlinks=0); print(e.name, '%x/%x/%x/%x' % (i.st_mode, i.st_size, int(i.st_atime), int(i.st_mtime)), sep='/')\\n"
-				"  print('', flush=1)"
+				"	with os.scandir(s) as d:\\n"
+				"		for e in d:\\n"
+				"			i = e.stat(follow_symlinks=0); print(e.name, '%x/%x/%x/%x' % (i.st_mode, i.st_size, int(i.st_atime), int(i.st_mtime)), sep='/')\\n"
+				"		print('', flush=1)"
 			)
 			cmd = f'{self.pythonStr} -c "exec(\\\"{code}\\\")"'
 			self.stdin, self.stdout, self.stderr = self.ssh.exec_command(cmd)
@@ -136,7 +136,8 @@ class RemoteListDir:
 		try:
 			self.stdin.write(path + "\n")
 			self.stdin.flush()
-		except OSError: # Socket is closed
+		except OSError: # Socket is closed (probably because remote python crashed because the scanned folder was inaccessible because script did not have suficent permissions)
+			self.stdin = None # reset stdin so the remote script gets recreated on the next use # TODO find a better solution to this
 			raise SimpleError(
 				f'RemoteListDir.listdir_attr: remote script returned error when listing folder "{path}":\n{ \
 				self.stderr.read().decode(errors="ignore").strip() \
@@ -148,18 +149,21 @@ class RemoteListDir:
 			filename, st_mode, st_size, st_atime, st_mtime = line.split("/")
 			entries.append(LocalSFTPAttributes.from_values(
 				filename=filename,
-				st_mode=int(st_mode, 16),
-				st_size=int(st_size, 16),
+				st_mode =int(st_mode , 16),
+				st_size =int(st_size , 16),
 				st_atime=int(st_atime, 16),
 				st_mtime=int(st_mtime, 16),
 			))
 		return entries
 
-def remoteHasPython(ssh: paramiko.SSHClient, throwOnNotFound: bool = True) -> str:
-	""" Returns python alias that worked """
+def remoteHasPython(ssh: paramiko.SSHClient, throwOnNotFound = True, enforcePythonVer = "3") -> str:
+	"""
+	Returns python alias that worked.
+	You can pass empty str as enforcePythonVer to not enforce version.
+	"""
 	for candidate in ("python", "python3", "py"):
 		stdin, stdout, stderr = ssh.exec_command(f"{candidate} --version")
-		if stdout.channel.recv_exit_status() == 0:
+		if stdout.read().decode(errors="ignore").strip().lower().startswith(f"python {enforcePythonVer}"):
 			return candidate
 
 	if throwOnNotFound:
