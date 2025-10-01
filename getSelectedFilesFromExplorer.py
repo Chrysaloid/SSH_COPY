@@ -4,6 +4,7 @@ import win32gui
 import ctypes
 
 from SimpleError import SimpleError
+from commonConstants import COLOR_OK
 
 def getTopmostExplorerHwnd() -> int | None:
 	"""Get the HWND of the topmost (most recently active) Explorer window."""
@@ -44,6 +45,6 @@ def getSelectedFilesFromExplorer(infoAndError=True, forwardSlashes=True) -> list
 		if not selectedFiles:
 			raise SimpleError("No files/folders selected")
 		else:
-			print(f"{clr(len(selectedFiles), "green")} file(s)/folder(s) selected")
+			print(f"{clr(len(selectedFiles), COLOR_OK)} file(s)/folder(s) selected")
 
 	return selectedFiles

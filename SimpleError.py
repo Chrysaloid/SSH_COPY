@@ -1,8 +1,10 @@
 import sys
 from termcolor import colored as clr
+from commonConstants import COLOR_ERROR
 
 class SimpleError(Exception):
-	def __init__(self, message: str, color = "red"):
+	def __init__(self, message: str, color = COLOR_ERROR):
+		""" Print (in red) only the message without the traceback """
 		if color:
 			self.message = clr(message, color)
 		else:

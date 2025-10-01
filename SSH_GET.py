@@ -7,6 +7,7 @@ import argparse
 from SimpleError import SimpleError
 from sshUtils import getSSH
 from getPlatform import WINDOWS
+from commonConstants import COLOR_OK
 
 TITLE = "SSH GET"
 
@@ -86,10 +87,10 @@ for file in files:
 		info = sftp.stat(remotePath)
 		os.utime(localPath, (info.st_atime, info.st_mtime))
 	print(file)
-print(f"\nSuccessfully got {clr(len(files), "green")} file(s)\n")
+print(f"\nSuccessfully got {clr(len(files), COLOR_OK)} file(s)\n")
 
 sftp.close()
 ssh.close()
 
 if dontClose:
-	input(clr("\nPress ENTER to continue...", "green"))
+	input(clr("\nPress ENTER to continue...", COLOR_OK))

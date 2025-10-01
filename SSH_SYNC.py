@@ -8,7 +8,7 @@ from fnmatch import fnmatchcase, fnmatch
 import sys
 from datetime import datetime
 import posixpath
-from typing import Callable, Tuple
+from typing import Callable, Tuple, List
 import shutil
 from collections import defaultdict
 from itertools import chain
@@ -31,9 +31,12 @@ from getPlatform import WINDOWS
 from fileUtils import isFile, isDir, modifiedDate, assertFolderExists, ensureFolderExists, mkdir as localMkdir
 from LocalSFTPAttributes import local_listdir_attr
 from isFolderCaseSensitive import isFolderCaseSensitive as isLocalFolderCaseSensitive
+from commonConstants import COLOR_OK, COLOR_ERROR, COLOR_WARN, VISITED_ATTR
 # endregion
 
 TITLE = "SSH SYNC"
+DEST_STR = "destination"
+SOURCE_STR = "source"
 
 if WINDOWS:
 	import ctypes
@@ -84,7 +87,7 @@ class IncludeExcludeAction(argparse.Action):
 			items.append(NameFilter(pattern, self.matchVal, self.matchingFunc))
 
 class MODE(IntEnum):
-	UPDATE = auto()
+	SYNC = auto()
 	COPY = auto()
 
 MODE_DICT = {mode.name.lower(): mode for mode in MODE}
@@ -96,7 +99,7 @@ def getMode(modeStr: str):
 	except:
 		raise SimpleError(f'-m/--mode option should be one of the values: {",".join(MODE_DICT.keys())}')
 
-parser._optionals.title = "Optional arguments"
+parser._optionals.title = "Optional common arguments"
 
 parser.add_argument("-i", "--include-files"       , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for files to include in copy/sync"                   , dest="inExcludeFiles"  , metavar=("PATTERN_1", "PATTERN_2"))
 parser.add_argument("-e", "--exclude-files"       , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for files to exclude in copy/sync"                   , dest="inExcludeFiles"  , metavar=("PATTERN_1", "PATTERN_2"))
@@ -109,57 +112,65 @@ parser.add_argument("-A", "--exclude-folders-case", default=[], action=IncludeEx
 parser.add_argument("-u", "--username"                  , default=""                    , help="Remote username")
 parser.add_argument("-H", "--hostname"                  , default=""                    , help="Remote host's address")
 parser.add_argument("-p", "--password"                  , default=""                    , help="Remote password")
+parser.add_argument("-P", "--port"                      , default=22, type=int          , help="Remote port (default: 22)")
+parser.add_argument("-T", "--timeout"                   , default=1, type=float         , help="TCP 3-way handshake timeout in seconds (default: 1)", metavar="SECONDS")
 parser.add_argument("-n", "--files-newer-than"          , default=""                    , help="Copy/Sync only files newer then this date"  , dest="filesNewerThan"  , metavar="DATE")
 parser.add_argument("-f", "--folders-newer-than"        , default=""                    , help="Copy/Sync only folders newer then this date", dest="foldersNewerThan", metavar="DATE")
-parser.add_argument("-F", "--force"                     , action="store_true"           , help="Force copying of source files even if they are older then destination files", dest="force")
-parser.add_argument("-N", "--newer-than-newest-file"    , action="store_true"           , help="Copy only files newer then the newest file in the destination folder", dest="newerThanNewestFile")
-parser.add_argument("-M", "--newer-than-newest-folder"  , action="store_true"           , help="Copy only files newer then the newest folder in the destination folder", dest="newerThanNewestFolder")
-parser.add_argument("-D", "--dont-filter-dest"          , action="store_false"          , help="Don't filter the destination files/folders WHEN SEARCHING FOR THE NEWEST FILE", dest="filterDest")
 parser.add_argument("-R", "--recursive"                 , default=0, nargs="?", type=int, help="Recurse into subdirectories. Optionaly takes max recursion depth as parameter", dest="maxRecursionDepth", metavar="MAX_RECURSION_DEPTH")
+parser.add_argument("-S", "--create-dest-folder"        , action="store_true"           , help="If destination folder doesn't exists, create it and all its parents (like mkdir (-p on Linux)). If not set terminate the script if the folder doesn not exist", dest="createDestFolder")
 parser.add_argument("-x", "--create-max-rec-folders"    , action="store_true"           , help="Create folders at max recursion depth", dest="createMaxRecFolders")
 parser.add_argument("-v", "--verbose"                   , action="store_true"           , help="Print verbose information. Good for debugging")
 parser.add_argument("-s", "--silent"                    , action="store_true"           , help="Print only errors")
-parser.add_argument("-P", "--port"                      , default=22, type=int          , help="Remote port (default: 22)")
-parser.add_argument("-T", "--timeout"                   , default=1, type=float         , help="TCP 3-way handshake timeout in seconds (default: 1)", metavar="SECONDS")
-parser.add_argument("-t", "--dont-preserve-times"       , action="store_false"          , help="If set, modification times will not be preserved", dest="preserveTimes")
+parser.add_argument("-t", "--dont-preserve-times"       , action="store_false"          , help="If set, modification times will not be preserved and instead files/folders will have current time set as their modification time", dest="preserveTimes")
+parser.add_argument("-B", "--dont-preserve-permissions" , action="store_false"          , help="If set, permissions will not be preserved and instead files/folders will have default permissions set", dest="preservePermissions")
 parser.add_argument("-d", "--dont-close"                , action="store_true"           , help="Don't auto-close console window at the end if no error occurred. You will have to close it manually or by pressing ENTER", dest="dontClose")
-parser.add_argument("-m", "--mode"                      , default="COPY"                , help=f'One of values: {",".join(MODE_DICT.keys())} (Default: copy)')
-parser.add_argument("-S", "--create-dest-folder"        , action="store_true"           , help="If destination folder doesn't exists, create it and all its parents (like mkdir (-p on Linux)). If not set terminate the script if the folder doesn not exist", dest="createDestFolder")
 parser.add_argument("-b", "--fast-remote-listdir-attr"  , action="store_true"           , help="If you copy/sync folder(s) containing more than 5000 entries from/to remote location this may be faster. Requires Python 3 on remote host", dest="fastRemoteListdirAttr")
 parser.add_argument("-k", "--listdir-attr-fallback"     , action="store_true"           , help='Instead of terminating the script if remote does not have Python 3, fall back to "slow" listdir-attr. Only applicable if -b/--fast-remote-listdir-attr was set', dest="listdirAttrFallback")
-parser.add_argument("-K", "--end-on-inaccessible-folder", action="store_false"          , help="Terminate the script if it does not have enough perrmisions to access any encountered folder (local or remote)", dest="skipInaccessibleFolders")
+parser.add_argument("-K", "--end-on-inaccessible-entry" , action="store_true"           , help="Terminate the script if it does not have enough perrmisions to access any encountered file/folder (local or remote). If not set ignore such cases but print a warning", dest="endOnInaccessibleEntry")
+parser.add_argument("-L", "--end-on-file-onto-folder"   , action="store_true"           , help="Terminate the script if a file is to be copied onto a folder and vice versa. If not set ignore such cases but print a warning", dest="endOnFileOntoFolder")
+parser.add_argument("-G", "--sort-entries"              , action="store_true"           , help="Sort files/folders by name alphabetically before copying. Except for making the logs look more familiar it does not have much other use cases", dest="sortEntries")
 
-# for action in parser._actions: # set metavar as UPPER_SNAKE of long parameter name
-# 	action.metavar = max(action.option_strings, key=len).lstrip("-").upper().replace("-","_")
+parser.add_argument("-m", "--mode", default="copy", choices=MODE_DICT.keys(), type=str.lower, help=f'One of values: {",".join(MODE_DICT.keys())} (Default: copy)')
+
+copyMode = parser.add_argument_group("COPY mode arguments")
+copyMode.add_argument("-F", "--force"                   , action="store_true" , help="Force copying of source files even if they are older then destination files", dest="force")
+copyMode.add_argument("-N", "--newer-than-newest-file"  , action="store_true" , help="Copy only files newer then the newest file in the destination folder", dest="newerThanNewestFile")
+copyMode.add_argument("-M", "--newer-than-newest-folder", action="store_true" , help="Copy only files newer then the newest folder in the destination folder", dest="newerThanNewestFolder")
+copyMode.add_argument("-D", "--dont-filter-dest"        , action="store_false", help="Don't filter the destination files/folders WHEN SEARCHING FOR THE NEWEST FILE", dest="filterDest")
+
+# syncMode = parser.add_argument_group("SYNC mode arguments")
 
 args = parser.parse_args()
 
-username                : str                = args.username
-hostname                : str                = args.hostname
-password                : str                = args.password
-localFolder             : str                = args.localFolder
-remoteFolder            : str                = args.remoteFolder
-inExcludeFiles          : list  [NameFilter] = args.inExcludeFiles
-inExcludeFolders        : list  [NameFilter] = args.inExcludeFolders
-force                   : bool               = args.force
-newerThanNewestFile     : bool               = args.newerThanNewestFile
-newerThanNewestFolder   : bool               = args.newerThanNewestFolder
-filterDest              : bool               = args.filterDest
-maxRecursionDepth       : int                = args.maxRecursionDepth
-createMaxRecFolders     : bool               = args.createMaxRecFolders
-verbose                 : bool               = args.verbose
-silent                  : bool               = args.silent
-filesNewerThan          : str                = args.filesNewerThan
-foldersNewerThan        : str                = args.foldersNewerThan
-port                    : int                = args.port
-timeout                 : float              = args.timeout
-preserveTimes           : bool               = args.preserveTimes
-dontClose               : bool               = args.dontClose
-mode                    : str                = args.mode
-createDestFolder        : bool               = args.createDestFolder
-fastRemoteListdirAttr   : bool               = args.fastRemoteListdirAttr
-listdirAttrFallback     : bool               = args.listdirAttrFallback
-skipInaccessibleFolders : bool               = args.skipInaccessibleFolders # True by default
+username               : str                = args.username
+hostname               : str                = args.hostname
+password               : str                = args.password
+localFolder            : str                = args.localFolder
+remoteFolder           : str                = args.remoteFolder
+inExcludeFiles         : list  [NameFilter] = args.inExcludeFiles
+inExcludeFolders       : list  [NameFilter] = args.inExcludeFolders
+force                  : bool               = args.force
+newerThanNewestFile    : bool               = args.newerThanNewestFile
+newerThanNewestFolder  : bool               = args.newerThanNewestFolder
+filterDest             : bool               = args.filterDest
+maxRecursionDepth      : int                = args.maxRecursionDepth
+createMaxRecFolders    : bool               = args.createMaxRecFolders
+verbose                : bool               = args.verbose
+silent                 : bool               = args.silent
+filesNewerThan         : str                = args.filesNewerThan
+foldersNewerThan       : str                = args.foldersNewerThan
+port                   : int                = args.port
+timeout                : float              = args.timeout
+preserveTimes          : bool               = args.preserveTimes
+preservePermissions    : bool               = args.preservePermissions
+dontClose              : bool               = args.dontClose
+mode                   : str                = args.mode
+createDestFolder       : bool               = args.createDestFolder
+fastRemoteListdirAttr  : bool               = args.fastRemoteListdirAttr
+listdirAttrFallback    : bool               = args.listdirAttrFallback
+endOnInaccessibleEntry : bool               = args.endOnInaccessibleEntry
+endOnFileOntoFolder    : bool               = args.endOnFileOntoFolder
+sortEntries            : bool               = args.sortEntries
 # endregion
 
 # region #* PARAMETER VALIDATION
@@ -171,7 +182,7 @@ elif maxRecursionDepth < 0:
 	raise SimpleError("-R/--recursive option's parameter cannot be negative")
 elif maxRecursionDepth == 0: # -R/--recursive was not specified at all
 	if (inExcludeFolders or foldersNewerThan) and not createMaxRecFolders and not silent:
-		cprint("Warning: Folder filtering options don't work if -R/--recursive or -x/--create-max-rec-folders was not specified", "yellow")
+		cprint("Warning: Folder filtering options don't work if -R/--recursive or -x/--create-max-rec-folders was not specified", COLOR_WARN)
 
 if any((username, hostname, password)) and not all((username, hostname, password)):
 	raise SimpleError("If any of the parameters -u/--username, -H/--hostname, -p/--password is specified then all of them must be specified")
@@ -206,6 +217,7 @@ def preProcessFilesOrFolders(
 				break
 			except ValueError:
 				pass
+
 		if not newerThanDate:
 			raise SimpleError(f'Incorrect {newerThanParamName} parameter: {newerThan}')
 
@@ -222,6 +234,7 @@ def preProcessFilesOrFolders(
 			for filterObj in inExclude:
 				if filterObj.matchingFunc(name, filterObj.pattern):
 					return filterObj.matchVal
+
 			return defaultMatch
 	else:
 		def match(name: str) -> bool:
@@ -237,10 +250,12 @@ try:
 	localIdx = sys.argv.index("-l")
 except ValueError:
 	localIdx = sys.argv.index("--local-folder")
+
 try:
 	remoteIdx = sys.argv.index("-r")
 except ValueError:
 	remoteIdx = sys.argv.index("--remote-folder")
+
 LOCAL_IS_SOURCE = localIdx < remoteIdx
 # REMOTE_IS_SOURCE = not LOCAL_IS_SOURCE
 
@@ -251,6 +266,7 @@ else:
 	sourceFolder = remoteFolder
 	destFolder   = localFolder
 
+# Verifying local folder
 if LOCAL_IS_SOURCE or not REMOTE_IS_REMOTE:
 	assertFolderExists(sourceFolder)
 
@@ -260,7 +276,13 @@ if not LOCAL_IS_SOURCE or not REMOTE_IS_REMOTE:
 	else:
 		assertFolderExists(destFolder, "\nYou can create it by specifying the -S/--create-dest-folder parameter")
 
-def isFolderCaseSensitiveBase(isWindows: bool, realFunc: Callable, realFuncArgs: tuple, folderType: str, path: str) -> tuple[bool, bool]: # errorOccured, caseSense
+def isFolderCaseSensitiveBase(
+	isWindows: bool,
+	realFunc: Callable,
+	realFuncArgs: tuple,
+	folderType: str,
+	path: str
+) -> tuple[bool, bool]: # errorOccured, caseSense
 	if not isWindows:
 		return (False, True)
 
@@ -270,7 +292,7 @@ def isFolderCaseSensitiveBase(isWindows: bool, realFunc: Callable, realFuncArgs:
 	except Exception as e:
 		errorOccured = True
 		if not silent:
-			cprint(f'Error occured when determining if {folderType} folder {f'"{path}"' if not verbose else ""} is case-sensitive:\n{e}', "red")
+			cprint(f'Error occured when determining if {folderType} folder {f'"{path}"' if not verbose else ""} is case-sensitive:\n{e}', COLOR_ERROR)
 		caseSense = False # Good assumption as this is the default on windows
 
 	return (errorOccured, caseSense)
@@ -279,6 +301,7 @@ if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 	ssh = getSSH(username, hostname, password, timeout, port, silent)
 	sftp = ssh.open_sftp()
 
+	# Verifying remote folder
 	if LOCAL_IS_SOURCE:
 		if createDestFolder:
 			ensureRemoteFolderExists(sftp, destFolder)
@@ -289,13 +312,13 @@ if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 
 	def remoteMkdir(path): return remoteMkdirBase(sftp, path)
 
-	if fastRemoteListdirAttr and (pythonStr := remoteHasPython(ssh, throwOnNotFound=not listdirAttrFallback)): # don't throw if listdirAttrFallback
+	if fastRemoteListdirAttr and (pythonStr := remoteHasPython(ssh, throwOnNotFound = not listdirAttrFallback)): # don't throw if listdirAttrFallback
 		# it's only noticeably faster if one of the remote folders that will be scanned has more than 5000 entries
 		rld = RemoteListDir(ssh, pythonStr, init=False) # don't init the remote python script because remote_listdir_attr might not get called at all
 		remote_listdir_attr = rld.listdir_attr
 	else:
 		if verbose and fastRemoteListdirAttr and not pythonStr:
-			cprint('Warning: remote host does not have python. Falling back to "slow" listdir-attr', "yellow")
+			cprint('Warning: remote host does not have python. Falling back to "slow" listdir-attr', COLOR_WARN)
 		def remote_listdir_attr(path: str): return tuple(sftp.listdir_iter(path)) # this is faster than sftp.listdir_attr because listdir_iter is async
 
 	if LOCAL_IS_SOURCE:
@@ -308,14 +331,24 @@ if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 		sourceUtime = os.utime
 		destUtime = sftp.utime
 
-		copyFun = sftp.put
+		sourceChmod = os.chmod
+		destChmod = sftp.chmod
+
+		copySourceDest = sftp.put
+		copyDestSource = sftp.get
+
+		sourceRemove = os.remove
+		destRemove = sftp.remove
+
+		sourceRmdir = os.rmdir
+		destRmdir = sftp.rmdir
 
 		sourceIsWindows = WINDOWS
 		destIsWindows = remoteIsWindows(ssh)
 
 		# Only for Windows
-		def isSourceFolderCaseSensitive(path: str): return isFolderCaseSensitiveBase(sourceIsWindows, isLocalFolderCaseSensitive, (path, False), "source", path)
-		def isDestFolderCaseSensitive(path: str): return isFolderCaseSensitiveBase(destIsWindows, isRemoteFolderCaseSensitive, (ssh, path), "destination", path)
+		def isSourceFolderCaseSensitive(path: str): return isFolderCaseSensitiveBase(sourceIsWindows, isLocalFolderCaseSensitive , (path, False), SOURCE_STR, path)
+		def isDestFolderCaseSensitive  (path: str): return isFolderCaseSensitiveBase(destIsWindows  , isRemoteFolderCaseSensitive, (ssh , path ), DEST_STR  , path)
 	else:
 		sourceFolderIter = remote_listdir_attr
 		destFolderIter = local_listdir_attr
@@ -326,39 +359,131 @@ if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 		sourceUtime = sftp.utime
 		destUtime = os.utime
 
-		copyFun = sftp.get
+		sourceChmod = sftp.chmod
+		destChmod = os.chmod
+
+		copySourceDest = sftp.get
+		copyDestSource = sftp.put
+
+		sourceRemove = sftp.remove
+		destRemove = os.remove
+
+		sourceRmdir = sftp.rmdir
+		destRmdir = os.rmdir
 
 		sourceIsWindows = remoteIsWindows(ssh)
 		destIsWindows = WINDOWS
 
-		def isSourceFolderCaseSensitive(path: str): return isFolderCaseSensitiveBase(sourceIsWindows, isRemoteFolderCaseSensitive, (ssh, path), "source", path)
-		def isDestFolderCaseSensitive(path: str): return isFolderCaseSensitiveBase(destIsWindows, isLocalFolderCaseSensitive, (path, False), "destination", path)
+		def isSourceFolderCaseSensitive(path: str): return isFolderCaseSensitiveBase(sourceIsWindows, isRemoteFolderCaseSensitive, (ssh , path ), SOURCE_STR, path)
+		def isDestFolderCaseSensitive  (path: str): return isFolderCaseSensitiveBase(destIsWindows  , isLocalFolderCaseSensitive , (path, False), DEST_STR  , path)
 else: # remoteFolder ACTUALLY refers to a LOCAL folder
 	sourceFolderIter = local_listdir_attr
-	destFolderIter = local_listdir_attr
+	destFolderIter   = local_listdir_attr
 
 	sourceMkdir = localMkdir
-	destMkdir = localMkdir
+	destMkdir   = localMkdir
 
 	sourceUtime = os.utime
-	destUtime = os.utime
+	destUtime   = os.utime
 
-	copyFun = shutil.copy2
+	sourceChmod = os.chmod
+	destChmod   = os.chmod
+
+	copySourceDest = shutil.copyfile
+	copyDestSource = shutil.copyfile
+
+	sourceRemove = os.remove
+	destRemove   = os.remove
+
+	sourceRmdir = os.rmdir
+	destRmdir   = os.rmdir
 
 	sourceIsWindows = WINDOWS
-	destIsWindows = WINDOWS
+	destIsWindows   = WINDOWS
 
-	def isSourceFolderCaseSensitive(path: str): return isFolderCaseSensitiveBase(sourceIsWindows, isLocalFolderCaseSensitive, (path, False), "source", path)
-	def isDestFolderCaseSensitive(path: str): return isFolderCaseSensitiveBase(destIsWindows, isLocalFolderCaseSensitive, (path, False), "destination", path)
+	def isSourceFolderCaseSensitive(path: str): return isFolderCaseSensitiveBase(sourceIsWindows, isLocalFolderCaseSensitive, (path, False), SOURCE_STR, path)
+	def isDestFolderCaseSensitive  (path: str): return isFolderCaseSensitiveBase(destIsWindows  , isLocalFolderCaseSensitive, (path, False), DEST_STR  , path)
 
 SOURCE_DESIGNATION = "local" if LOCAL_IS_SOURCE else ("remote" if REMOTE_IS_REMOTE else "local")
 DEST_DESIGNATION = ("remote" if REMOTE_IS_REMOTE else "local") if LOCAL_IS_SOURCE else "local"
 
 DEST_FILTER_WARN = verbose and filterDest and any(filter(lambda f: f.matchingFunc is fnmatchcase, inExcludeFiles + inExcludeFolders))
+
+# Preserving permissions is only sensible when copying files between Unix machines as Windows has
+# different permission system, incompatible with Unix
+preservePermissions = preservePermissions and not sourceIsWindows and not destIsWindows
 # endregion
 
 # region #* FILE COPYING
-def permissionErrorHandler(err: Exception, designation: str, type: str, path: str):
+def recursiveRemove(
+	folderPath: str,
+	entry: paramiko.SFTPAttributes,
+	iterFun: Callable,
+	removeFileFun: Callable,
+	removeFolderFun: Callable,
+	designation: str,
+	type: str,
+):
+	basePath = posixpath.join(folderPath, entry.filename)
+	if isFile(entry):
+		try:
+			removeFileFun(basePath)
+		except Exception as e:
+			permissionErrorHandler(e, designation, type, basePath, "file", "deleting")
+	elif isDir(entry):
+		try:
+			entries = iterFun(basePath)
+		except Exception as e:
+			permissionErrorHandler(e, designation, type, basePath)
+			return
+
+		for entry in entries:
+			newPath = posixpath.join(folderPath, entry.filename)
+			if isFile(entry):
+				try:
+					removeFileFun(newPath)
+				except Exception as e:
+					permissionErrorHandler(e, designation, type, basePath, "file", "deleting")
+			elif isDir(entry):
+				recursiveRemove(newPath, entry, iterFun, removeFileFun, removeFolderFun)
+
+		try:
+			removeFolderFun(basePath)
+		except Exception as e:
+			permissionErrorHandler(e, designation, type, basePath, "folder", "deleting")
+
+	# try:
+	# 	newPath = ""
+	# 	basePath = posixpath.join(folderPath, entry.filename)
+	# 	if isFile(entry):
+	# 		removeFileFun(basePath)
+	# 	elif isDir(entry):
+	# 		entries = iterFun(basePath)
+
+	# 		for entry in entries:
+	# 			newPath = posixpath.join(folderPath, entry.filename)
+	# 			if isFile(entry):
+	# 				removeFileFun(newPath)
+	# 			elif isDir(entry):
+	# 				if recursiveRemove(newPath, entry, iterFun, removeFileFun, removeFolderFun):
+	# 					return True
+
+	# 		removeFolderFun(basePath)
+
+	# 	return False
+	# except Exception as e:
+	# 	permissionErrorHandler(e, designation, type, newPath or basePath, "folder", "deleting")
+	# 	return True
+
+def fileOnFolderErrorHandler(entry: paramiko.SFTPAttributes):
+	txt = f'Warning: tried copying a {'file' if isFile(entry) else 'folder'} onto a {'folder' if isFile(entry) else 'file'} with a name "{entry.filename}"'
+	if endOnFileOntoFolder:
+		raise SimpleError(txt)
+	else:
+		if not silent:
+			cprint(txt, COLOR_WARN)
+
+def permissionErrorHandler(err: Exception, designation: str, type: str, path: str, fileFolder = "folder", operation = "listing"):
 	# This is not the best way to correctly identify permission errors but it needs to be this way
 	# because of inconsistencies in OSes and SSH server implementations. On Windows I observed that
 	# when logged as non admin and trying to listdir admin's folder the server returns "Bad message"
@@ -366,12 +491,12 @@ def permissionErrorHandler(err: Exception, designation: str, type: str, path: st
 	# text. I think the servers should return the SFTP_PERMISSION_DENIED error code so the error
 	# could be casted to PermissionError by paramiko but it is what it is...
 	if err is PermissionError or (err is IOError and (errorMsg := str(err)) and (errorMsg == "Failure" or errorMsg == "Bad message")):
-		txt = f'Permission denied when listing {designation} {type} folder "{path}"'
-		if skipInaccessibleFolders:
-			if not silent:
-				cprint(txt, "yellow")
-		else:
+		txt = f'Warning: permission denied when {operation} the {designation} {type} {fileFolder} "{path}"'
+		if endOnInaccessibleEntry:
 			raise SimpleError(txt)
+		else:
+			if not silent:
+				cprint(txt, COLOR_WARN)
 	else:
 		raise err
 
@@ -390,138 +515,314 @@ def filterFun(entry: paramiko.SFTPAttributes):
 			elif not folderMatch(name):
 				print(f"{name} - skipping because folderMatch returned False")
 			else:
-				print(f"{name} - skipping folder because of unknown reason") # Shouldn't happen
+				cprint(f"{name} - skipping file because of unknown reason", COLOR_ERROR) # Shouldn't happen
 		elif isFile(entry):
 			if not (filesNewerThanDate <= entry.st_mtime):
 				print(f'{name} - skipping because it ({modifiedDate(entry)}) is not newer than -n/--files-newer-than parameter')
 			elif not fileMatch(name):
 				print(f"{name} - skipping because fileMatch returned False")
 			else:
-				print(f"{name} - skipping file because of unknown reason") # Shouldn't happen
+				cprint(f"{name} - skipping file because of unknown reason", COLOR_ERROR) # Shouldn't happen
 		else:
 			print(f"{name} - skipping because it is not a file nor folder")
 
 	return val
 
+def checkCaseDuplicates(
+	entriesList: list[paramiko.SFTPAttributes],
+	sourceErrorOccured: bool,
+	destErrorOccured: bool,
+	designation: str,
+	type: str,
+	path: str
+) -> list[paramiko.SFTPAttributes]:
+	""" Check for case-insensitive filename duplicates and exclude them from copy/sync operations """
+	caselessEntries = defaultdict(list)
+	for entry in entriesList:
+		caselessEntries[entry.filename.lower()].append(entry)
+
+	caseDuplicates: list[list[paramiko.SFTPAttributes]] = []
+	for entries in caselessEntries.values():
+		if len(entries) > 1:
+			caseDuplicates.append(entries)
+
+	if caseDuplicates:
+		if not silent:
+			print(f'Following files/folders in the {designation} {type} folder "{path}" have names that only differ in letter case:')
+			for i, entries in enumerate(caseDuplicates, start=1):
+				print(f"Group {i}:")
+				for entry in entries:
+					print(entry.filename)
+			cprint(f"And they will not be copied unless you change their names or enable case-sensitivity in the destination Windows folder with fsutil.exe", COLOR_WARN)
+		caseDuplicatesFlattened = tuple(chain.from_iterable(caseDuplicates))
+		entriesList = tuple(filter(lambda e: e not in caseDuplicatesFlattened, entriesList))
+	elif sourceErrorOccured or destErrorOccured:
+		if not silent:
+			cprint(f"...but it won't cause any problems because {designation} {type} files/folders are case-sensitivly unique", COLOR_OK)
+
+	return entriesList
+
+def recursiveCopyHelper(
+	sourceEntry: paramiko.SFTPAttributes,
+	sourceFolderParam: str,
+	sourceFolderBase: str,
+	destEntry: paramiko.SFTPAttributes,
+	destFolderParam: str,
+	name: str,
+	depth: int,
+	copySourceDest: Callable,
+	destUtime: Callable,
+	destChmod: Callable,
+	dest_designation: str,
+	dest_str: str,
+	force: bool = False,
+	newestDestDate: int = 0,
+):
+	# In the following code posixpath.join is used correctly with case-sensitive name because:
+	#    1. Windows accepts forward slashes "/" as path separators
+	#    2. Windows paths are case-insensitive but case preserving so it will normalize the path before accessing the FS
+	if isFile(sourceEntry) and newestDestDate < sourceEntry.st_mtime:
+		if destEntry and isDir(destEntry):
+			if VISITED_ATTR not in destEntry.__dict__: # To not print the same warning twice
+				fileOnFolderErrorHandler(sourceEntry)
+				setattr(sourceEntry, VISITED_ATTR, True)
+				setattr(destEntry, VISITED_ATTR, True)
+			return False # ACTUALLY continue (sort of)
+
+		if force or not destEntry or destEntry.st_mtime < sourceEntry.st_mtime:
+			sourcePath = posixpath.join(sourceFolderParam, name)
+			destPath   = posixpath.join(destFolderParam  , name)
+			if not silent:
+				cprint(sourcePath.replace(sourceFolderBase, "", count=1), COLOR_OK)
+
+			try:
+				copySourceDest(sourcePath, destPath)
+			except Exception as e:
+				permissionErrorHandler(e, dest_designation, dest_str, destPath)
+				return True # REALLY return because every next file would raise the same exception
+
+			if preserveTimes:
+				destUtime(destPath, (sourceEntry.st_atime, sourceEntry.st_mtime))
+
+			if preservePermissions and (not destEntry or sourceEntry.st_mode != destEntry.st_mode):
+				destChmod(destPath, sourceEntry.st_mode)
+		elif verbose:
+			if not (destEntry.st_mtime < sourceEntry.st_mtime):
+				print(f"{name} - skipping because it is not newer than the {dest_str}")
+			else:
+				cprint(f"{name} - skipping file because of unknown reason", COLOR_ERROR) # Shouldn't happen
+	elif isDir(sourceEntry) and (depth < maxRecursionDepth or createMaxRecFolders):
+		if VISITED_ATTR in sourceEntry.__dict__: # So the next function call doesn't execute the remaining code
+			return False # ACTUALLY continue (sort of)
+
+		setattr(sourceEntry, VISITED_ATTR, True)
+		if destEntry: setattr(destEntry, VISITED_ATTR, True)
+
+		if destEntry and isFile(destEntry):
+			fileOnFolderErrorHandler(sourceEntry)
+			return False # ACTUALLY continue (sort of)
+
+		newDestFolder = posixpath.join(destFolderParam, name)
+		if not destEntry:
+			destMkdir(newDestFolder)
+
+		if preservePermissions and (not destEntry or sourceEntry.st_mode != destEntry.st_mode):
+			destChmod(newDestFolder, sourceEntry.st_mode)
+
+		if depth < maxRecursionDepth:
+			newSourceFolder = posixpath.join(sourceFolderParam, name)
+			recursiveCopy(newSourceFolder, newDestFolder, depth + 1)
+
+		if preserveTimes:
+			destUtime(newDestFolder, (sourceEntry.st_atime, sourceEntry.st_mtime))
+	elif verbose:
+		if isFile(sourceEntry):
+			if not (newestDestDate < sourceEntry.st_mtime):
+				print(f"{name} - skipping because it ({modifiedDate(sourceEntry)}) is not newer than newestDestDate")
+			else:
+				cprint(f"{name} - skipping file because of unknown reason", COLOR_ERROR) # Shouldn't happen
+		elif isDir(sourceEntry):
+			if not (depth < maxRecursionDepth or createMaxRecFolders):
+				print(f"{name} - skipping because it we are at max recursion depth and createMaxRecFolders is False")
+			else:
+				cprint(f"{name} - skipping file because of unknown reason", COLOR_ERROR) # Shouldn't happen
+
+	return False
+
 def recursiveCopy(sourceFolderParam: str, destFolderParam: str, depth: int = 0):
 	if verbose:
 		print(f"Entering {SOURCE_DESIGNATION} source folder: {sourceFolderParam}")
+		print(f"Scanning {DEST_DESIGNATION} destination folder: {destFolderParam}")
 
 	match mode:
 		case MODE.COPY:
 			try:
 				sourceEntries = tuple(filter(filterFun, sourceFolderIter(sourceFolderParam)))
 			except Exception as e:
-				permissionErrorHandler(e, SOURCE_DESIGNATION, "source", sourceFolderParam)
+				permissionErrorHandler(e, SOURCE_DESIGNATION, SOURCE_STR, sourceFolderParam)
 				return
 
-			if sourceEntries:
-				sourceErrorOccured, sourceCaseSense = isSourceFolderCaseSensitive(sourceFolderParam)
-				destErrorOccured, destCaseSense = isDestFolderCaseSensitive(destFolderParam)
-				# ANY_CASE_INSENSITIVE = not sourceCaseSense or not destCaseSense
+			if not sourceEntries: return
 
-				if sourceCaseSense and not destCaseSense: # Most probable scenario: copy from Linux to Windows
-					caselessEntries = defaultdict(list)
-					for entry in sourceEntries:
-						caselessEntries[entry.filename.lower()].append(entry)
-					caseDuplicates: list[list[paramiko.SFTPAttributes]] = []
-					for entries in caselessEntries.values():
-						if len(entries) > 1:
-							caseDuplicates.append(entries)
-					if caseDuplicates:
-						if not silent:
-							print(f'Following files/folders in the source folder "{sourceFolderParam}" have names that only differ in letter case:')
-							for i, entries in enumerate(caseDuplicates, start=1):
-								print(f"Group {i}:")
-								for entry in entries:
-									print(entry.filename)
-							cprint(f"And they will not be copied unless you change their names or enable case-sensitivity in the destination Windows folder with fsutil.exe", "yellow")
-						caseDuplicatesFlattened = tuple(chain.from_iterable(caseDuplicates))
-						sourceEntries = tuple(filter(lambda e: e not in caseDuplicatesFlattened, sourceEntries))
-						if not sourceEntries:
-							return
-					elif destErrorOccured:
-						if not silent:
-							cprint(f"...but it won't cause any problems because source files/folders are case-sensitivly unique", "green")
+			sourceErrorOccured, sourceCaseSense = isSourceFolderCaseSensitive(sourceFolderParam)
+			destErrorOccured  , destCaseSense   = isDestFolderCaseSensitive  (destFolderParam  )
+			# ANY_CASE_INSENSITIVE = not sourceCaseSense or not destCaseSense
 
-				try:
-					if newerThanNewestFile or newerThanNewestFolder or not force:
-						destEntries = destFolderIter(destFolderParam)
-						if verbose:
-							print(f"Scanning {DEST_DESIGNATION} destination folder: {destFolderParam}")
-					else:
-						destEntries = () # Empty tuple
-				except Exception as e:
-					permissionErrorHandler(e, DEST_DESIGNATION, "destination", destFolderParam)
-					return
+			if sourceCaseSense and not destCaseSense: # Most probable scenario: copy from Linux to Windows
+				sourceEntries = checkCaseDuplicates(sourceEntries, sourceErrorOccured, destErrorOccured, SOURCE_DESIGNATION, SOURCE_STR, sourceFolderParam)
+				if not sourceEntries: return
 
-				newestDestDate = 0
-				if newerThanNewestFile or newerThanNewestFolder: # find newest file/folder in the destination folder
-					if DEST_FILTER_WARN and not destCaseSense:
-						cprint("Warning: When searching for newest file in the destination folder you may have excluded some files/folders case-sensitivly but the folder is case-insensitive", "yellow")
-					entryCount = 0
-					for entry in (filter(innerFilterFun, destEntries) if filterDest else destEntries):
-						if newerThanNewestFile and isFile(entry) or newerThanNewestFolder and isDir(entry):
-							entryCount += 1
-							if newestDestDate < entry.st_mtime:
-								newestDestDate = entry.st_mtime
-					if verbose:
-						matching = " matching" if filterDest else ""
-						filesFolders = "files/folders" if newerThanNewestFile and newerThanNewestFolder else ("files" if newerThanNewestFile else "folders")
-						theNewest = f"and the newest from them has date {datetime.fromtimestamp(newestDestDate)} -> newestDestDate" if entryCount else ""
-						print(f'Destination folder has {entryCount}{matching} {filesFolders} {theNewest}')
+			if sortEntries:
+				sourceEntries = sorted(sourceEntries, key=lambda x: x.filename)
 
-				# Explanation for following if staments containing destCaseSense:
-				# sourceCaseSense and destCaseSense: (i.e. Linux -> Linux) Both are case-sensitive so no need to normalize case
-				# sourceCaseSense and not destCaseSense: (i.e. Linux -> Windows) Case normalization necessary as Windows is case-insensitive
-				# not sourceCaseSense and destCaseSense: (i.e. Windows -> Linux) No need to normalize case as case-insensitive names are a subset of case-sensitive names
-				# not sourceCaseSense and not destCaseSense: (i.e. Windows -> Windows) Case normalization necessary as both are case-insensitive
-				# So we can se that case normalization is only necessary if not destCaseSense
-				if destCaseSense:
-					destEntriesDict = {entry.filename: entry for entry in destEntries}
-				else:
-					destEntriesDict = {entry.filename.lower(): entry for entry in destEntries}
+			try:
+				destEntries = destFolderIter(destFolderParam)
+			except Exception as e:
+				permissionErrorHandler(e, DEST_DESIGNATION, DEST_STR, destFolderParam)
+				return
 
-				# In the following loop posixpath.join is used correctly with case-sensitive name because:
-				#    1. Windows accepts forward slashes "/" as path separators
-				#    2. Windows paths are case-insensitive but case preserving so it will normalize the path before accessing the FS
-				for sourceEntry in sourceEntries:
-					name = sourceEntry.filename
-					if isDir(sourceEntry) and (depth < maxRecursionDepth or createMaxRecFolders):
-						newDestFolder = posixpath.join(destFolderParam, name)
-						if (name if destCaseSense else name.lower()) not in destEntriesDict:
-							if destMkdir(newDestFolder) and preserveTimes:
-								destUtime(newDestFolder, (sourceEntry.st_atime, sourceEntry.st_mtime))
-						if depth < maxRecursionDepth:
-							newSourceFolder = posixpath.join(sourceFolderParam, name)
-							recursiveCopy(newSourceFolder, newDestFolder, depth + 1)
-					elif isFile(sourceEntry) and newestDestDate < sourceEntry.st_mtime:
-						destEntry = destEntriesDict.get(name if destCaseSense else name.lower())
-						if force or not destEntry or destEntry.st_mtime < sourceEntry.st_mtime:
-							sourcePath = posixpath.join(sourceFolderParam, name)
-							destPath = posixpath.join(destFolderParam, name)
-							if not silent:
-								print(clr(sourcePath.replace(sourceFolder, "", count=1), "green"))
-							try:
-								copyFun(sourcePath, destPath)
-							except Exception as e:
-								permissionErrorHandler(e, DEST_DESIGNATION, "destination", destPath)
-								return
-							if preserveTimes:
-								destUtime(destPath, (sourceEntry.st_atime, sourceEntry.st_mtime))
-						elif verbose:
-							if force:
-								print(f"{name} - skipping because it exists")
-							elif not (destEntry.st_mtime < sourceEntry.st_mtime):
-								print(f"{name} - skipping because it is not newer than the destination")
-					elif verbose:
-						if isFile(sourceEntry):
-							if not (newestDestDate < sourceEntry.st_mtime):
-								print(f'{name} - skipping because it ({modifiedDate(sourceEntry)}) is not newer than newestDestDate')
-							else:
-								print(f"{name} - skipping file because of unknown reason") # Shouldn't happen
-		case MODE.UPDATE:
-			pass
+			newestDestDate = 0
+			if newerThanNewestFile or newerThanNewestFolder: # find newest file/folder in the destination folder
+				if DEST_FILTER_WARN and not destCaseSense:
+					cprint("Warning: When searching for newest file in the destination folder you may have excluded some files/folders case-sensitivly but the destination folder is case-insensitive", COLOR_WARN)
+
+				entryCount = 0
+				for entry in (filter(innerFilterFun, destEntries) if filterDest else destEntries):
+					if newerThanNewestFile and isFile(entry) or newerThanNewestFolder and isDir(entry):
+						entryCount += 1
+						if newestDestDate < entry.st_mtime:
+							newestDestDate = entry.st_mtime
+
+				if verbose:
+					matching = " matching" if filterDest else ""
+					filesFolders = "files/folders" if newerThanNewestFile and newerThanNewestFolder else ("files" if newerThanNewestFile else "folders")
+					theNewest = f"and the newest from them has date {datetime.fromtimestamp(newestDestDate)} -> newestDestDate" if entryCount else ""
+					print(f"Destination folder has {entryCount}{matching} {filesFolders} {theNewest}")
+
+			# Explanation for following if staments containing destCaseSense:
+			# sourceCaseSense and destCaseSense: (i.e. Linux -> Linux) Both are case-sensitive so no need to normalize case
+			# sourceCaseSense and not destCaseSense: (i.e. Linux -> Windows) Case normalization necessary as Windows is case-insensitive
+			# not sourceCaseSense and destCaseSense: (i.e. Windows -> Linux) No need to normalize case as case-insensitive names are a subset of case-sensitive names
+			# not sourceCaseSense and not destCaseSense: (i.e. Windows -> Windows) Case normalization necessary as both are case-insensitive
+			# So we can se that case normalization is only necessary if not destCaseSense
+			if destCaseSense:
+				destEntriesDict = {entry.filename: entry for entry in destEntries}
+			else:
+				destEntriesDict = {entry.filename.lower(): entry for entry in destEntries}
+
+			for sourceEntry in sourceEntries:
+				name = sourceEntry.filename
+				if recursiveCopyHelper(
+					sourceEntry       = sourceEntry,
+					destEntry         = destEntriesDict.get(name if destCaseSense else name.lower()),
+					sourceFolderParam = sourceFolderParam,
+					sourceFolderBase  = sourceFolder,
+					destFolderParam   = destFolderParam,
+					name              = name,
+					depth             = depth,
+					copySourceDest    = copySourceDest,
+					destUtime         = destUtime,
+					destChmod         = destChmod,
+					dest_designation  = DEST_DESIGNATION,
+					dest_str          = DEST_STR,
+					force             = force,
+					newestDestDate    = newestDestDate,
+				): return
+		case MODE.SYNC:
+			try:
+				sourceEntriesBase = sourceFolderIter(sourceFolderParam)
+			except Exception as e:
+				permissionErrorHandler(e, SOURCE_DESIGNATION, SOURCE_STR, sourceFolderParam)
+				return
+
+			try:
+				destEntriesBase   = destFolderIter(destFolderParam)
+			except Exception as e:
+				permissionErrorHandler(e, DEST_DESIGNATION, DEST_STR, destFolderParam)
+				return
+
+			sourceEntries = tuple(filter(filterFun, sourceEntriesBase))
+			destEntries   = tuple(filter(filterFun, destEntriesBase  ))
+
+			if not (sourceEntries or destEntries): return
+
+			sourceErrorOccured, sourceCaseSense = isSourceFolderCaseSensitive(sourceFolderParam)
+			destErrorOccured  , destCaseSense   = isDestFolderCaseSensitive  (destFolderParam  )
+
+			if not sourceCaseSense or not destCaseSense:
+				sourceEntries = checkCaseDuplicates(sourceEntries, sourceErrorOccured, destErrorOccured, SOURCE_DESIGNATION, SOURCE_STR, sourceFolderParam)
+				destEntries   = checkCaseDuplicates(destEntries  , sourceErrorOccured, destErrorOccured, DEST_DESIGNATION  , DEST_STR  , destFolderParam  )
+
+				if not (sourceEntries or destEntries): return
+
+				sourceEntriesDictBase = {entry.filename.lower(): entry for entry in sourceEntriesBase }
+				destEntriesDictBase   = {entry.filename.lower(): entry for entry in destEntriesBase   }
+				sourceEntriesDict     = {entry.filename.lower(): entry for entry in sourceEntries     }
+				destEntriesDict       = {entry.filename.lower(): entry for entry in destEntries       }
+			else:
+				sourceEntriesDictBase = {entry.filename: entry for entry in sourceEntriesBase }
+				destEntriesDictBase   = {entry.filename: entry for entry in destEntriesBase   }
+				sourceEntriesDict     = {entry.filename: entry for entry in sourceEntries     }
+				destEntriesDict       = {entry.filename: entry for entry in destEntries       }
+
+			allNames = sourceEntriesDict.keys() | destEntriesDict.keys()
+
+			if sortEntries:
+				allNames = sorted(allNames)
+
+			newestCommonDate = 0
+			allEntries: List[Tuple[paramiko.SFTPAttributes, paramiko.SFTPAttributes, str]] = []
+			for name in allNames:
+				sourceEntry = sourceEntriesDict.get(name)
+				destEntry   = destEntriesDict  .get(name)
+				allEntries.append((sourceEntry, destEntry, name))
+				if sourceEntry and destEntry and sourceEntry.st_mtime == destEntry.st_mtime:
+					if newestCommonDate < sourceEntry.st_mtime:
+						newestCommonDate = sourceEntry.st_mtime
+
+			for sourceEntry, destEntry, name in allEntries:
+				# When sourceEntry is None sourceEntryBase might not be None (because i.e. folders where
+				# filetered out). That's why we need to get it from the dict and check it. The same
+				# applies to destEntry and destEntryBase.
+				# When sourceEntry is not None and sourceEntryBase is not None then they should refer to
+				# the same object so sourceEntry is sourceEntryBase == True
+				sourceEntryBase = sourceEntriesDictBase.get(name)
+				destEntryBase   = destEntriesDictBase  .get(name)
+
+				if sourceEntry:
+					if not destEntryBase and sourceEntry.st_mtime < newestCommonDate:
+						recursiveRemove(sourceFolderParam, sourceEntry, sourceFolderIter, sourceRemove, sourceRmdir, SOURCE_DESIGNATION, SOURCE_STR)
+					elif recursiveCopyHelper(
+						sourceEntry       = sourceEntry,
+						destEntry         = destEntryBase,
+						sourceFolderParam = sourceFolderParam,
+						sourceFolderBase  = sourceFolder,
+						destFolderParam   = destFolderParam,
+						name              = name,
+						depth             = depth,
+						copySourceDest    = copySourceDest,
+						destUtime         = destUtime,
+						destChmod         = destChmod,
+						dest_designation  = DEST_DESIGNATION,
+						dest_str          = DEST_STR,
+					): return
+				if destEntry:
+					if not sourceEntryBase and destEntry.st_mtime < newestCommonDate:
+						recursiveRemove(destFolderParam, destEntry, destFolderIter, destRemove, destRmdir, DEST_DESIGNATION, DEST_STR)
+					elif recursiveCopyHelper(
+						sourceEntry       = destEntry,
+						destEntry         = sourceEntryBase,
+						sourceFolderParam = destFolderParam,
+						sourceFolderBase  = destFolder,
+						destFolderParam   = sourceFolderParam,
+						name              = name,
+						depth             = depth,
+						copySourceDest    = copyDestSource,
+						destUtime         = sourceUtime,
+						destChmod         = sourceChmod,
+						dest_designation  = SOURCE_DESIGNATION,
+						dest_str          = SOURCE_STR,
+					): return
 		case _: # Shouldn't happen
 			raise SimpleError(f"Invalid mode: {mode}")
 
@@ -547,5 +848,5 @@ if dontClose:
 	if silent:
 		input("")
 	else:
-		input(clr("\nPress ENTER to continue...", "green"))
+		input(clr("\nPress ENTER to continue...", COLOR_OK))
 # endregion

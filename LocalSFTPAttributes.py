@@ -5,10 +5,10 @@ class LocalSFTPAttributes:
 	def __init__(self, entry: os.DirEntry):
 		info = entry.stat(follow_symlinks=False)
 		self.filename = entry.name
-		self.st_mode = info.st_mode
-		self.st_size = info.st_size
-		self.st_uid = info.st_uid
-		self.st_gid = info.st_gid
+		self.st_mode  = info.st_mode
+		self.st_size  = info.st_size
+		self.st_uid   = info.st_uid
+		self.st_gid   = info.st_gid
 		self.st_atime = int(info.st_atime)
 		self.st_mtime = int(info.st_mtime)
 

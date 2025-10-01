@@ -11,6 +11,7 @@ from SimpleError import SimpleError
 from sshUtils import getSSH, assertRemoteFolderExists, remoteMkdir
 from getPlatform import WINDOWS
 from fileUtils import isFile, isDir
+from commonConstants import COLOR_OK, COLOR_ERROR, COLOR_WARN, COLOR_ERROR_BACK
 
 TITLE = "SSH SEND"
 
@@ -97,7 +98,7 @@ if zeroFile:
 		pass
 
 sftp.close()
-print(f"\nSuccessfully sent {clr(totalFiles + int(zeroFile), "green")} file(s)\n")
+print(f"\nSuccessfully sent {clr(totalFiles + int(zeroFile), COLOR_OK)} file(s)\n")
 
 exitStatus = 0
 if endCommand:
@@ -114,7 +115,7 @@ if endCommand:
 
 		exitStatus = channel.recv_exit_status()
 		if exitStatus:
-			print(f"{clr("Exit status:", "red")} {clr(exitStatus, "on_red")}")
+			print(f"{clr("Exit status:", COLOR_ERROR)} {clr(exitStatus, COLOR_ERROR_BACK)}")
 
 ssh.close()
 
@@ -124,4 +125,4 @@ if exitStatus:
 	exit(exitStatus)
 
 if dontClose:
-	input(clr("\nPress ENTER to continue...", "green"))
+	input(clr("\nPress ENTER to continue...", COLOR_OK))
