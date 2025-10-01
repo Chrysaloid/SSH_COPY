@@ -12,6 +12,7 @@ from sshUtils import getSSH, assertRemoteFolderExists, remoteMkdir
 from getPlatform import WINDOWS
 from fileUtils import isFile, isDir
 from commonConstants import COLOR_OK, COLOR_ERROR, COLOR_WARN, COLOR_ERROR_BACK
+from argparseUtils import ArgumentParser_ColoredError
 
 TITLE = "SSH SEND"
 
@@ -24,7 +25,7 @@ else:
 	from getSelectedFilesFromStdIn import getSelectedFilesFromStdIn
 	print(f"\33]0;{TITLE}\a", end="", flush=True) # Hide title
 
-parser = argparse.ArgumentParser(description="Parse connection details")
+parser = ArgumentParser_ColoredError(description="Parse connection details")
 
 parser.add_argument("-u", "--username"     , required=True, help="Remote username")
 parser.add_argument("-H", "--hostname"     , required=True, help="Remote host's address")

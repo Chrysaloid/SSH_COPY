@@ -1,4 +1,4 @@
-# SSH_COPY - 1.0.0
+# SSH_COPY - 1.0.1
 Small collection of Python scripts to easily copy files between devices in the same local network. You must set up DHCP (static IP addresses) in your router settings otherwise the scripts won't work as their setup relies on hardcoded (by You) addresses in the shortcuts or wrapper scripts.
 
 ## Initial setup
@@ -114,3 +114,5 @@ options:
   -d, --dont-close                Don't auto-close console window at the end if no error
                                   occurred. You will have to close it manually or by pressing ENTER
 ```
+
+## SSH_SYNC.py
