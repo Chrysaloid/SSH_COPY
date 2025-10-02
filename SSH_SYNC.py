@@ -13,6 +13,7 @@ import shutil
 from collections import defaultdict
 from itertools import chain
 from enum import IntEnum, auto
+from types import SimpleNamespace
 
 start = time.time()
 
@@ -31,13 +32,13 @@ from getPlatform import WINDOWS
 from fileUtils import isFile, isDir, modifiedDate, assertFolderExists, ensureFolderExists, mkdir as localMkdir
 from LocalSFTPAttributes import local_listdir_attr
 from isFolderCaseSensitive import isFolderCaseSensitive as isLocalFolderCaseSensitive
-from commonConstants import COLOR_OK, COLOR_ERROR, COLOR_WARN, VISITED_ATTR
+from commonConstants import COLOR_OK, COLOR_ERROR, COLOR_WARN, COLOR_EMPHASIS
 from argparseUtils import ArgumentParser_ColoredError, NoRepeatAction, NameFilter, IncludeExcludeAction
 # endregion
 
 TITLE = "SSH SYNC"
-DEST_STR = "destination"
 SOURCE_STR = "source"
+DEST_STR   = "destination"
 
 if WINDOWS:
 	import ctypes
@@ -378,12 +379,124 @@ else: # remoteFolder ACTUALLY refers to a LOCAL folder
 	def isSourceFolderCaseSensitive(path: str): return isFolderCaseSensitiveBase(sourceIsWindows, isLocalFolderCaseSensitive, (path, False), SOURCE_STR, path)
 	def isDestFolderCaseSensitive  (path: str): return isFolderCaseSensitiveBase(destIsWindows  , isLocalFolderCaseSensitive, (path, False), DEST_STR  , path)
 
-SOURCE_DESIGNATION = "local"   if LOCAL_IS_SOURCE  else ("remote" if REMOTE_IS_REMOTE else "local")
+SOURCE_DESIGNATION =  "local"  if LOCAL_IS_SOURCE  else ("remote" if REMOTE_IS_REMOTE else "local")
 DEST_DESIGNATION   = ("remote" if REMOTE_IS_REMOTE else  "local") if LOCAL_IS_SOURCE  else "local"
-if verbose:
-	SOURCE_DESIGNATION_PADDED = SOURCE_DESIGNATION.ljust(max(len(SOURCE_DESIGNATION), len(DEST_DESIGNATION)))
-	DEST_DESIGNATION_PADDED   = DEST_DESIGNATION  .ljust(max(len(SOURCE_DESIGNATION), len(DEST_DESIGNATION)))
-	ENTERING_OK = clr("Entering", COLOR_OK)
+SOURCE_DESIGNATION_PADDED = SOURCE_DESIGNATION.ljust(max(len(SOURCE_DESIGNATION), len(DEST_DESIGNATION)))
+DEST_DESIGNATION_PADDED   = DEST_DESIGNATION  .ljust(max(len(SOURCE_DESIGNATION), len(DEST_DESIGNATION)))
+ENTERING_OK = clr("Entering", COLOR_OK)
+
+class MyNamespace:
+	def __init__(self,
+		sourceFolderIter,
+		destFolderIter,
+		sourceMkdir,
+		destMkdir,
+		sourceUtime,
+		destUtime,
+		sourceChmod,
+		destChmod,
+		copySourceDest,
+		copyDestSource,
+		sourceRemove,
+		destRemove,
+		sourceRmdir,
+		destRmdir,
+		sourceIsWindows,
+		destIsWindows,
+		isSourceFolderCaseSensitive,
+		isDestFolderCaseSensitive,
+		source_designation,
+		dest_designation,
+		source_designation_padded,
+		dest_designation_padded,
+		source_str,
+		dest_str,
+		sourceFolderBase,
+		destFolderBase,
+	):
+		self.sourceFolderIter            : Callable = sourceFolderIter
+		self.destFolderIter              : Callable = destFolderIter
+		self.sourceMkdir                 : Callable = sourceMkdir
+		self.destMkdir                   : Callable = destMkdir
+		self.sourceUtime                 : Callable = sourceUtime
+		self.destUtime                   : Callable = destUtime
+		self.sourceChmod                 : Callable = sourceChmod
+		self.destChmod                   : Callable = destChmod
+		self.copySourceDest              : Callable = copySourceDest
+		self.copyDestSource              : Callable = copyDestSource
+		self.sourceRemove                : Callable = sourceRemove
+		self.destRemove                  : Callable = destRemove
+		self.sourceRmdir                 : Callable = sourceRmdir
+		self.destRmdir                   : Callable = destRmdir
+		self.sourceIsWindows             : Callable = sourceIsWindows
+		self.destIsWindows               : Callable = destIsWindows
+		self.isSourceFolderCaseSensitive : Callable = isSourceFolderCaseSensitive
+		self.isDestFolderCaseSensitive   : Callable = isDestFolderCaseSensitive
+		self.source_designation          : str = source_designation
+		self.dest_designation            : str = dest_designation
+		self.source_designation_padded   : str = source_designation_padded
+		self.dest_designation_padded     : str = dest_designation_padded
+		self.source_str                  : str = source_str
+		self.dest_str                    : str = dest_str
+		self.sourceFolderBase            : str = sourceFolderBase
+		self.destFolderBase              : str = destFolderBase
+
+normalNS = MyNamespace(
+	sourceFolderIter            = sourceFolderIter,
+	destFolderIter              = destFolderIter,
+	sourceMkdir                 = sourceMkdir,
+	destMkdir                   = destMkdir,
+	sourceUtime                 = sourceUtime,
+	destUtime                   = destUtime,
+	sourceChmod                 = sourceChmod,
+	destChmod                   = destChmod,
+	copySourceDest              = copySourceDest,
+	copyDestSource              = copyDestSource,
+	sourceRemove                = sourceRemove,
+	destRemove                  = destRemove,
+	sourceRmdir                 = sourceRmdir,
+	destRmdir                   = destRmdir,
+	sourceIsWindows             = sourceIsWindows,
+	destIsWindows               = destIsWindows,
+	isSourceFolderCaseSensitive = isSourceFolderCaseSensitive,
+	isDestFolderCaseSensitive   = isDestFolderCaseSensitive,
+	source_designation          = SOURCE_DESIGNATION,
+	dest_designation            = DEST_DESIGNATION,
+	source_designation_padded   = SOURCE_DESIGNATION_PADDED,
+	dest_designation_padded     = DEST_DESIGNATION_PADDED,
+	source_str                  = SOURCE_STR,
+	dest_str                    = DEST_STR,
+	sourceFolderBase            = sourceFolder,
+	destFolderBase              = destFolder,
+)
+reverseNS = MyNamespace(
+	sourceFolderIter            = destFolderIter,
+	destFolderIter              = sourceFolderIter,
+	sourceMkdir                 = destMkdir,
+	destMkdir                   = sourceMkdir,
+	sourceUtime                 = destUtime,
+	destUtime                   = sourceUtime,
+	sourceChmod                 = destChmod,
+	destChmod                   = sourceChmod,
+	copySourceDest              = copyDestSource,
+	copyDestSource              = copySourceDest,
+	sourceRemove                = destRemove,
+	destRemove                  = sourceRemove,
+	sourceRmdir                 = destRmdir,
+	destRmdir                   = sourceRmdir,
+	sourceIsWindows             = destIsWindows,
+	destIsWindows               = sourceIsWindows,
+	isSourceFolderCaseSensitive = isDestFolderCaseSensitive,
+	isDestFolderCaseSensitive   = isSourceFolderCaseSensitive,
+	source_designation          = DEST_DESIGNATION,
+	dest_designation            = SOURCE_DESIGNATION,
+	source_designation_padded   = DEST_DESIGNATION_PADDED,
+	dest_designation_padded     = SOURCE_DESIGNATION_PADDED,
+	source_str                  = DEST_STR,
+	dest_str                    = SOURCE_STR,
+	sourceFolderBase            = destFolder,
+	destFolderBase              = sourceFolder,
+)
 
 DEST_FILTER_WARN = verbose and filterDest and any(filter(lambda f: f.matchingFunc is fnmatchcase, inExcludeFiles + inExcludeFolders))
 
@@ -393,6 +506,7 @@ preservePermissions = preservePermissions and not sourceIsWindows and not destIs
 # endregion
 
 # region #* FILE COPYING
+REMOVE_COLOR = COLOR_EMPHASIS
 def recursiveRemove(
 	folderPath: str,
 	entry: paramiko.SFTPAttributes,
@@ -406,6 +520,8 @@ def recursiveRemove(
 	if isFile(entry):
 		try:
 			removeFileFun(basePath)
+			if not silent:
+				cprint(f"Removed: {basePath}", REMOVE_COLOR)
 		except Exception as e:
 			permissionErrorHandler(e, designation, type, basePath, "file", "deleting")
 	elif isDir(entry):
@@ -420,6 +536,8 @@ def recursiveRemove(
 			if isFile(entry):
 				try:
 					removeFileFun(newPath)
+					if not silent:
+						cprint(f"Removed: {newPath}", REMOVE_COLOR)
 				except Exception as e:
 					permissionErrorHandler(e, designation, type, basePath, "file", "deleting")
 			elif isDir(entry):
@@ -427,31 +545,10 @@ def recursiveRemove(
 
 		try:
 			removeFolderFun(basePath)
+			if not silent:
+				cprint(f"Removed: {basePath}", REMOVE_COLOR)
 		except Exception as e:
 			permissionErrorHandler(e, designation, type, basePath, "folder", "deleting")
-
-	# try:
-	# 	newPath = ""
-	# 	basePath = posixpath.join(folderPath, entry.filename)
-	# 	if isFile(entry):
-	# 		removeFileFun(basePath)
-	# 	elif isDir(entry):
-	# 		entries = iterFun(basePath)
-
-	# 		for entry in entries:
-	# 			newPath = posixpath.join(folderPath, entry.filename)
-	# 			if isFile(entry):
-	# 				removeFileFun(newPath)
-	# 			elif isDir(entry):
-	# 				if recursiveRemove(newPath, entry, iterFun, removeFileFun, removeFolderFun):
-	# 					return True
-
-	# 		removeFolderFun(basePath)
-
-	# 	return False
-	# except Exception as e:
-	# 	permissionErrorHandler(e, designation, type, newPath or basePath, "folder", "deleting")
-	# 	return True
 
 def fileOnFolderErrorHandler(entry: paramiko.SFTPAttributes):
 	txt = f'Warning: tried copying a {'file' if isFile(entry) else 'folder'} onto a {'folder' if isFile(entry) else 'file'} with a name "{entry.filename}"'
@@ -463,11 +560,11 @@ def fileOnFolderErrorHandler(entry: paramiko.SFTPAttributes):
 
 def permissionErrorHandler(err: Exception, designation: str, type: str, path: str, fileFolder = "folder", operation = "listing"):
 	# This is not the best way to correctly identify permission errors but it needs to be this way
-	# because of inconsistencies in OSes and SSH server implementations. On Windows I observed that
-	# when logged as non admin and trying to listdir admin's folder the server returns "Bad message"
-	# text. On Termux on Android when listdir'ing the root folder "/" the server returns "Failure"
-	# text. I think the servers should return the SFTP_PERMISSION_DENIED error code so the error
-	# could be casted to PermissionError by paramiko but it is what it is...
+	# because of inconsistencies in OSes and SSH server implementations. On Windows running OpenSSH I
+	# observed that when logged as non admin and trying to listdir admin's folder the server returns
+	# "Bad message" text. On Termux on Android running OpenSSH when listdir'ing the root folder "/"
+	# the server returns "Failure" text. I think the servers should return the SFTP_PERMISSION_DENIED
+	# error code so the error could be casted to PermissionError by paramiko but it is what it is...
 	if err is PermissionError or (err is IOError and (errorMsg := str(err)) and (errorMsg == "Failure" or errorMsg == "Bad message")):
 		txt = f'Warning: permission denied when {operation} the {designation} {type} {fileFolder} "{path}"'
 		if endOnInaccessibleEntry:
@@ -551,49 +648,52 @@ def checkCaseDuplicates(
 def recursiveCopyHelper(
 	sourceEntry: paramiko.SFTPAttributes,
 	sourceFolderParam: str,
-	sourceFolderBase: str,
 	destEntry: paramiko.SFTPAttributes,
 	destFolderParam: str,
-	name: str,
 	depth: int,
-	copySourceDest: Callable,
-	destUtime: Callable,
-	destChmod: Callable,
-	dest_designation: str,
-	dest_str: str,
+	NNS: MyNamespace,
+	RNS: MyNamespace,
 	force: bool = False,
 	newestDestDate: int = 0,
 ) -> ACTION:
 	# In the following code posixpath.join is used correctly with case-sensitive name because:
 	#    1. Windows accepts forward slashes "/" as path separators
 	#    2. Windows paths are case-insensitive but case preserving so it will normalize the path before accessing the FS
+	sourceName = sourceEntry.filename
+	destName = destEntry.filename if destEntry else sourceName
+
 	if not silent or verbose:
-		relPath = posixpath.join(sourceFolderParam, sourceEntry.filename).replace(sourceFolderBase, "", count=1)
+		relPath = posixpath.join(sourceFolderParam, sourceName).replace(NNS.sourceFolderBase, "", count=1)
+
 	if isFile(sourceEntry) and newestDestDate < sourceEntry.st_mtime:
 		if destEntry and isDir(destEntry):
 			fileOnFolderErrorHandler(sourceEntry)
 			return ACTION.CONTINUE # because in MODE.SYNC next function call would raise the same exception
 
 		if force or not destEntry or destEntry.st_mtime < sourceEntry.st_mtime:
-			sourcePath = posixpath.join(sourceFolderParam, name)
-			destPath   = posixpath.join(destFolderParam  , name)
+			sourcePath = posixpath.join(sourceFolderParam, sourceName)
+			destPath   = posixpath.join(destFolderParam  , destName  )
+
 			if not silent:
-				cprint(relPath, COLOR_OK)
+				if mode == MODE.SYNC:
+					cprint(f"{relPath} - {'source -> destination' if NNS is normalNS else 'destination -> source'}", COLOR_OK)
+				else: # MODE.COPY
+					cprint(relPath, COLOR_OK)
 
 			try:
-				copySourceDest(sourcePath, destPath)
+				NNS.copySourceDest(sourcePath, destPath)
 			except Exception as e:
-				permissionErrorHandler(e, dest_designation, dest_str, destPath)
+				permissionErrorHandler(e, NNS.dest_designation, NNS.dest_str, destPath)
 				return ACTION.RETURN # because every next file would raise the same exception
 
 			if preserveTimes:
-				destUtime(destPath, (sourceEntry.st_atime, sourceEntry.st_mtime))
+				NNS.destUtime(destPath, (sourceEntry.st_atime, sourceEntry.st_mtime))
 
 			if preservePermissions and (not destEntry or sourceEntry.st_mode != destEntry.st_mode):
-				destChmod(destPath, sourceEntry.st_mode)
+				NNS.destChmod(destPath, sourceEntry.st_mode)
 		elif verbose:
 			if not (destEntry.st_mtime < sourceEntry.st_mtime):
-				print(f"{relPath} - skipping file because it is not newer than the {dest_str}")
+				print(f"{relPath} - skipping file because it is not newer than the {NNS.dest_str}")
 			else:
 				cprint(f"{relPath} - skipping file because of unknown reason", COLOR_ERROR) # Shouldn't happen
 	elif isDir(sourceEntry) and (depth < maxRecursionDepth or createMaxRecFolders):
@@ -601,19 +701,25 @@ def recursiveCopyHelper(
 			fileOnFolderErrorHandler(sourceEntry)
 			return ACTION.CONTINUE
 
-		newDestFolder = posixpath.join(destFolderParam, name)
+		newDestFolder = posixpath.join(destFolderParam, destName)
 		if not destEntry:
-			destMkdir(newDestFolder)
+			NNS.destMkdir(newDestFolder)
 
 		if preservePermissions and (not destEntry or sourceEntry.st_mode != destEntry.st_mode):
-			destChmod(newDestFolder, sourceEntry.st_mode)
+			NNS.destChmod(newDestFolder, sourceEntry.st_mode)
 
 		if depth < maxRecursionDepth:
-			newSourceFolder = posixpath.join(sourceFolderParam, name)
-			recursiveCopy(newSourceFolder, newDestFolder, depth + 1)
+			newSourceFolder = posixpath.join(sourceFolderParam, sourceName)
+			recursiveCopy(
+				sourceFolderParam = newSourceFolder,
+				destFolderParam   = newDestFolder,
+				NNS = NNS,
+				RNS = RNS,
+				depth = depth + 1,
+			)
 
 		if preserveTimes: # We cannot set the time conditionally as putting any files inside the folder updated it modification date
-			destUtime(newDestFolder, (sourceEntry.st_atime, sourceEntry.st_mtime))
+			NNS.destUtime(newDestFolder, (sourceEntry.st_atime, sourceEntry.st_mtime))
 
 		return ACTION.CONTINUE # so te recursion doesn't happen on the next function call
 	elif verbose:
@@ -630,39 +736,45 @@ def recursiveCopyHelper(
 
 	return ACTION.NONE
 
-def recursiveCopy(sourceFolderParam: str, destFolderParam: str, depth: int = 0):
+def recursiveCopy(
+	sourceFolderParam: str,
+	destFolderParam: str,
+	NNS: MyNamespace,
+	RNS: MyNamespace,
+	depth: int = 0
+):
 	if verbose:
-		print(f"{ENTERING_OK} {SOURCE_DESIGNATION_PADDED} source      folder: {sourceFolderParam}")
-		print(f"{ENTERING_OK} {DEST_DESIGNATION_PADDED  } destination folder: {destFolderParam}")
-		filterFun = FilterClass(sourceFolderParam, sourceFolder)
+		print(f"{ENTERING_OK} {NNS.source_designation_padded} source      folder: {sourceFolderParam}")
+		print(f"{ENTERING_OK} {NNS.dest_designation_padded  } destination folder: {destFolderParam}")
+		filterFun = FilterClass(sourceFolderParam, NNS.sourceFolderBase)
 	else:
 		filterFun = innerFilterFun
 
 	match mode:
 		case MODE.COPY:
 			try:
-				sourceEntries = tuple(filter(filterFun, sourceFolderIter(sourceFolderParam)))
+				sourceEntries: tuple[paramiko.SFTPAttributes] = tuple(filter(filterFun, NNS.sourceFolderIter(sourceFolderParam)))
 			except Exception as e:
-				permissionErrorHandler(e, SOURCE_DESIGNATION, SOURCE_STR, sourceFolderParam)
+				permissionErrorHandler(e, NNS.source_designation, NNS.source_str, sourceFolderParam)
 				return
 
 			if not sourceEntries: return
 
-			sourceErrorOccured, sourceCaseSense = isSourceFolderCaseSensitive(sourceFolderParam)
-			destErrorOccured  , destCaseSense   = isDestFolderCaseSensitive  (destFolderParam  )
+			sourceErrorOccured, sourceCaseSense = NNS.isSourceFolderCaseSensitive(sourceFolderParam)
+			destErrorOccured  , destCaseSense   = NNS.isDestFolderCaseSensitive  (destFolderParam  )
 			# ANY_CASE_INSENSITIVE = not sourceCaseSense or not destCaseSense
 
 			if sourceCaseSense and not destCaseSense: # Most probable scenario: copy from Linux to Windows
-				sourceEntries = checkCaseDuplicates(sourceEntries, sourceErrorOccured, destErrorOccured, SOURCE_DESIGNATION, SOURCE_STR, sourceFolderParam)
+				sourceEntries = checkCaseDuplicates(sourceEntries, sourceErrorOccured, destErrorOccured, NNS.source_designation, NNS.source_str, sourceFolderParam)
 				if not sourceEntries: return
 
 			if sortEntries:
 				sourceEntries = sorted(sourceEntries, key=lambda x: x.filename)
 
 			try:
-				destEntries = destFolderIter(destFolderParam)
+				destEntries: list[paramiko.SFTPAttributes] = NNS.destFolderIter(destFolderParam)
 			except Exception as e:
-				permissionErrorHandler(e, DEST_DESIGNATION, DEST_STR, destFolderParam)
+				permissionErrorHandler(e, NNS.dest_designation, NNS.dest_str, destFolderParam)
 				return
 
 			newestDestDate = 0
@@ -700,29 +812,24 @@ def recursiveCopy(sourceFolderParam: str, destFolderParam: str, depth: int = 0):
 					sourceEntry       = sourceEntry,
 					destEntry         = destEntriesDict.get(name if destCaseSense else name.lower()),
 					sourceFolderParam = sourceFolderParam,
-					sourceFolderBase  = sourceFolder,
 					destFolderParam   = destFolderParam,
-					name              = name,
 					depth             = depth,
-					copySourceDest    = copySourceDest,
-					destUtime         = destUtime,
-					destChmod         = destChmod,
-					dest_designation  = DEST_DESIGNATION,
-					dest_str          = DEST_STR,
+					NNS               = NNS,
+					RNS               = RNS,
 					force             = force,
 					newestDestDate    = newestDestDate,
 				) == ACTION.RETURN: return
 		case MODE.SYNC:
 			try:
-				sourceEntriesBase = sourceFolderIter(sourceFolderParam)
+				sourceEntriesBase: list[paramiko.SFTPAttributes] = NNS.sourceFolderIter(sourceFolderParam)
 			except Exception as e:
-				permissionErrorHandler(e, SOURCE_DESIGNATION, SOURCE_STR, sourceFolderParam)
+				permissionErrorHandler(e, NNS.source_designation, NNS.source_str, sourceFolderParam)
 				return
 
 			try:
-				destEntriesBase   = destFolderIter(destFolderParam)
+				destEntriesBase: list[paramiko.SFTPAttributes] = NNS.destFolderIter(destFolderParam)
 			except Exception as e:
-				permissionErrorHandler(e, DEST_DESIGNATION, DEST_STR, destFolderParam)
+				permissionErrorHandler(e, NNS.dest_designation, NNS.dest_str, destFolderParam)
 				return
 
 			sourceEntries = tuple(filter(filterFun, sourceEntriesBase))
@@ -730,24 +837,24 @@ def recursiveCopy(sourceFolderParam: str, destFolderParam: str, depth: int = 0):
 
 			if not (sourceEntries or destEntries): return
 
-			sourceErrorOccured, sourceCaseSense = isSourceFolderCaseSensitive(sourceFolderParam)
-			destErrorOccured  , destCaseSense   = isDestFolderCaseSensitive  (destFolderParam  )
+			sourceErrorOccured, sourceCaseSense = NNS.isSourceFolderCaseSensitive(sourceFolderParam)
+			destErrorOccured  , destCaseSense   = NNS.isDestFolderCaseSensitive  (destFolderParam  )
 
 			if not sourceCaseSense or not destCaseSense:
-				sourceEntries = checkCaseDuplicates(sourceEntries, sourceErrorOccured, destErrorOccured, SOURCE_DESIGNATION, SOURCE_STR, sourceFolderParam)
-				destEntries   = checkCaseDuplicates(destEntries  , sourceErrorOccured, destErrorOccured, DEST_DESIGNATION  , DEST_STR  , destFolderParam  )
+				sourceEntries = checkCaseDuplicates(sourceEntries, sourceErrorOccured, destErrorOccured, NNS.source_designation, NNS.source_str, sourceFolderParam)
+				destEntries   = checkCaseDuplicates(destEntries  , sourceErrorOccured, destErrorOccured, NNS.dest_designation  , NNS.dest_str  , destFolderParam  )
 
 				if not (sourceEntries or destEntries): return
 
-				sourceEntriesDictBase = {entry.filename.lower(): entry for entry in sourceEntriesBase }
-				destEntriesDictBase   = {entry.filename.lower(): entry for entry in destEntriesBase   }
-				sourceEntriesDict     = {entry.filename.lower(): entry for entry in sourceEntries     }
-				destEntriesDict       = {entry.filename.lower(): entry for entry in destEntries       }
+				sourceEntriesDictBase = {entry.filename.lower(): entry for entry in sourceEntriesBase}
+				destEntriesDictBase   = {entry.filename.lower(): entry for entry in destEntriesBase  }
+				sourceEntriesDict     = {entry.filename.lower(): entry for entry in sourceEntries    }
+				destEntriesDict       = {entry.filename.lower(): entry for entry in destEntries      }
 			else:
-				sourceEntriesDictBase = {entry.filename: entry for entry in sourceEntriesBase }
-				destEntriesDictBase   = {entry.filename: entry for entry in destEntriesBase   }
-				sourceEntriesDict     = {entry.filename: entry for entry in sourceEntries     }
-				destEntriesDict       = {entry.filename: entry for entry in destEntries       }
+				sourceEntriesDictBase = {entry.filename: entry for entry in sourceEntriesBase}
+				destEntriesDictBase   = {entry.filename: entry for entry in destEntriesBase  }
+				sourceEntriesDict     = {entry.filename: entry for entry in sourceEntries    }
+				destEntriesDict       = {entry.filename: entry for entry in destEntries      }
 
 			allNames = sourceEntriesDict.keys() | destEntriesDict.keys()
 
@@ -775,54 +882,53 @@ def recursiveCopy(sourceFolderParam: str, destFolderParam: str, depth: int = 0):
 
 				if sourceEntry:
 					if not destEntryBase and sourceEntry.st_mtime < newestCommonDate:
-						recursiveRemove(sourceFolderParam, sourceEntry, sourceFolderIter, sourceRemove, sourceRmdir, SOURCE_DESIGNATION, SOURCE_STR)
+						recursiveRemove(sourceFolderParam, sourceEntry, NNS.sourceFolderIter, NNS.sourceRemove, NNS.sourceRmdir, NNS.source_designation, NNS.source_str)
 					else:
 						match recursiveCopyHelper(
 							sourceEntry       = sourceEntry,
 							destEntry         = destEntryBase,
 							sourceFolderParam = sourceFolderParam,
-							sourceFolderBase  = sourceFolder,
 							destFolderParam   = destFolderParam,
-							name              = name,
 							depth             = depth,
-							copySourceDest    = copySourceDest,
-							destUtime         = destUtime,
-							destChmod         = destChmod,
-							dest_designation  = DEST_DESIGNATION,
-							dest_str          = DEST_STR,
+							NNS               = NNS,
+							RNS               = RNS,
 						):
 							case ACTION.CONTINUE: continue
 							case ACTION.RETURN: return
 				if destEntry:
 					if not sourceEntryBase and destEntry.st_mtime < newestCommonDate:
-						recursiveRemove(destFolderParam, destEntry, destFolderIter, destRemove, destRmdir, DEST_DESIGNATION, DEST_STR)
+						recursiveRemove(destFolderParam, destEntry, NNS.destFolderIter, NNS.destRemove, NNS.destRmdir, NNS.dest_designation, NNS.dest_str)
 					else:
 						match recursiveCopyHelper(
 							sourceEntry       = destEntry,
 							destEntry         = sourceEntryBase,
 							sourceFolderParam = destFolderParam,
-							sourceFolderBase  = destFolder,
 							destFolderParam   = sourceFolderParam,
-							name              = name,
 							depth             = depth,
-							copySourceDest    = copyDestSource,
-							destUtime         = sourceUtime,
-							destChmod         = sourceChmod,
-							dest_designation  = SOURCE_DESIGNATION,
-							dest_str          = SOURCE_STR,
+							NNS               = RNS,
+							RNS               = NNS,
 						):
 							case ACTION.CONTINUE: continue
 							case ACTION.RETURN: return
-		case _: # Shouldn't happen
-			raise SimpleError(f"Invalid mode: {mode}")
+
 
 if not silent:
-	print(f"Copying from {SOURCE_DESIGNATION} to {DEST_DESIGNATION}")
+	match mode:
+		case MODE.COPY: operation = "Copying"
+		case MODE.SYNC: operation = "Syncing"
+
+	print(f"{operation} from {SOURCE_DESIGNATION} to {DEST_DESIGNATION}")
 	print(f"Source      folder: {sourceFolder}")
 	print(f"Destination folder: {destFolder}")
-	print("Copying files:\n")
+	print(f"{operation} files:\n")
 
-recursiveCopy(sourceFolder, destFolder, 0)
+recursiveCopy(
+	sourceFolderParam = sourceFolder,
+	destFolderParam   = destFolder,
+	NNS = normalNS,
+	RNS = reverseNS,
+	depth = 0,
+)
 
 # the try...finally block is not needed because when an exception happens "the program ends, the
 # Python process shuts down. As part of process teardown, the underlying socket to the SSH server is
