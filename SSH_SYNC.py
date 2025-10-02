@@ -911,7 +911,6 @@ def recursiveCopy(
 							case ACTION.CONTINUE: continue
 							case ACTION.RETURN: return
 
-
 if not silent:
 	match mode:
 		case MODE.COPY: operation = "Copying"
