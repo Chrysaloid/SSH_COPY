@@ -13,7 +13,6 @@ import shutil
 from collections import defaultdict
 from itertools import chain
 from enum import IntEnum, auto
-from types import SimpleNamespace
 
 start = time.time()
 
@@ -104,6 +103,7 @@ parser.add_argument("-k", "--listdir-attr-fallback"     , action="store_true"   
 parser.add_argument("-K", "--end-on-inaccessible-entry" , action="store_true"           , help="Terminate the script if it does not have enough perrmisions to access any encountered file/folder (local or remote). If not set ignore such cases but print a warning", dest="endOnInaccessibleEntry")
 parser.add_argument("-L", "--end-on-file-onto-folder"   , action="store_true"           , help="Terminate the script if a file is to be copied onto a folder and vice versa. If not set ignore such cases but print a warning", dest="endOnFileOntoFolder")
 parser.add_argument("-G", "--sort-entries"              , action="store_true"           , help="Sort files/folders by name alphabetically before copying. Except for making the logs look more familiar it does not have much other use cases", dest="sortEntries")
+# parser.add_argument("-u", "--dry-run"                   , action="store_true"           , help="Only create directories and disable all file copying operations and only print the output that would normally get printed", dest="dryRun")
 
 parser.add_argument("-m", "--mode", default="copy", choices=MODE_DICT.keys(), type=str.lower, help=f'One of values: {",".join(MODE_DICT.keys())} (Default: copy)')
 
@@ -146,6 +146,7 @@ listdirAttrFallback    : bool               = args.listdirAttrFallback
 endOnInaccessibleEntry : bool               = args.endOnInaccessibleEntry
 endOnFileOntoFolder    : bool               = args.endOnFileOntoFolder
 sortEntries            : bool               = args.sortEntries
+# dryRun                 : bool               = args.dryRun
 # endregion
 
 # region #* PARAMETER VALIDATION
@@ -808,7 +809,7 @@ def recursiveCopy(
 
 			for sourceEntry in sourceEntries:
 				name = sourceEntry.filename
-				if recursiveCopyHelper(
+				match recursiveCopyHelper(
 					sourceEntry       = sourceEntry,
 					destEntry         = destEntriesDict.get(name if destCaseSense else name.lower()),
 					sourceFolderParam = sourceFolderParam,
@@ -818,7 +819,8 @@ def recursiveCopy(
 					RNS               = RNS,
 					force             = force,
 					newestDestDate    = newestDestDate,
-				) == ACTION.RETURN: return
+				):
+					case ACTION.RETURN: return
 		case MODE.SYNC:
 			try:
 				sourceEntriesBase: list[paramiko.SFTPAttributes] = NNS.sourceFolderIter(sourceFolderParam)
