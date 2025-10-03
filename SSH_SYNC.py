@@ -592,7 +592,7 @@ if verbose:
 
 			if not val:
 				name = entry.filename
-				relPath = posixpath.join(self.sourceFolderParam, name).replace(self.sourceFolderBase, "", count=1)
+				relPath = posixpath.join(self.sourceFolderParam, name).replace(self.sourceFolderBase, "", 1)
 				if isDir(entry):
 					if not (foldersNewerThanDate <= entry.st_mtime):
 						print(f'{relPath} - skipping because it ({modifiedDate(entry)}) is not newer than -f/--folders-newer-than parameter')
@@ -664,7 +664,7 @@ def recursiveCopyHelper(
 	destName = destEntry.filename if destEntry else sourceName
 
 	if not silent or verbose:
-		relPath = posixpath.join(sourceFolderParam, sourceName).replace(NNS.sourceFolderBase, "", count=1)
+		relPath = posixpath.join(sourceFolderParam, sourceName).replace(NNS.sourceFolderBase, "", 1)
 
 	if isFile(sourceEntry) and newestDestDate < sourceEntry.st_mtime:
 		if destEntry and isDir(destEntry):
