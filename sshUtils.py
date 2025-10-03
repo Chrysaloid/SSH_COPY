@@ -12,7 +12,7 @@ from SimpleError import SimpleError
 from fileUtils import isDir, iteratePathParts
 from LocalSFTPAttributes import LocalSFTPAttributes
 
-def getSSH(username: str, hostname: str, password: str, TIMEOUT: float = 1, port = 22, silent = False):
+def getSSH(username: str, hostname: str, password: str, TIMEOUT: float = 5, port = 22, silent = False):
 	ssh = paramiko.SSHClient()
 	ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 

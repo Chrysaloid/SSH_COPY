@@ -14,7 +14,7 @@ from collections import defaultdict
 from itertools import chain
 from enum import IntEnum, auto
 
-start = time.time()
+start = time.perf_counter()
 
 from SimpleError import SimpleError
 from sshUtils import (
@@ -87,15 +87,15 @@ parser.add_argument("-u", "--username"                  , default=""            
 parser.add_argument("-H", "--hostname"                  , default=""                    , help="Remote host's address")
 parser.add_argument("-p", "--password"                  , default=""                    , help="Remote password")
 parser.add_argument("-P", "--port"                      , default=22, type=int          , help="Remote port (default: 22)")
-parser.add_argument("-T", "--timeout"                   , default=1, type=float         , help="TCP 3-way handshake timeout in seconds (default: 1)", metavar="SECONDS")
+parser.add_argument("-T", "--timeout"                   , default=5, type=float         , help="TCP 3-way handshake timeout in seconds (default: 5)", metavar="SECONDS")
 parser.add_argument("-n", "--files-newer-than"          , default=""                    , help="Copy/Sync only files newer then this date"  , dest="filesNewerThan"  , metavar="DATE")
 parser.add_argument("-f", "--folders-newer-than"        , default=""                    , help="Copy/Sync only folders newer then this date", dest="foldersNewerThan", metavar="DATE")
-parser.add_argument("-R", "--recursive"                 , default=0, nargs="?", type=int, help="Recurse into subdirectories. Optionaly takes max recursion depth as parameter", dest="maxRecursionDepth", metavar="MAX_RECURSION_DEPTH")
-parser.add_argument("-S", "--create-dest-folder"        , action="store_true"           , help="If destination folder doesn't exists, create it and all its parents (like mkdir (-p on Linux)). If not set terminate the script if the folder doesn not exist", dest="createDestFolder")
-parser.add_argument("-x", "--create-max-rec-folders"    , action="store_true"           , help="Create folders at max recursion depth", dest="createMaxRecFolders")
+parser.add_argument("-R", "--recursive"                 , default=0, nargs="?", type=int, help='Recurse into subdirectories. Optionaly takes max recursion depth as parameter. The source and destination folders are considered as depth == 0 so specifying "--recursive 0" is the same as not specyfying it at all', dest="maxRecursionDepth", metavar="MAX_RECURSION_DEPTH")
+parser.add_argument("-S", "--create-dest-folder"        , action="store_true"           , help="If destination folder doesn't exists, create it and all its parents (like mkdir (-p on Linux)). If not set terminate the script if the folder doesn't exist", dest="createDestFolder")
+parser.add_argument("-x", "--create-max-rec-folders"    , action="store_true"           , help="Create empty folders at max recursion depth", dest="createMaxRecFolders")
 parser.add_argument("-v", "--verbose"                   , action="store_true"           , help="Print verbose information. Good for debugging")
 parser.add_argument("-s", "--silent"                    , action="store_true"           , help="Print only errors")
-parser.add_argument("-t", "--dont-preserve-times"       , action="store_false"          , help="If set, modification times will not be preserved and instead files/folders will have current time set as their modification time", dest="preserveTimes")
+parser.add_argument("-t", "--dont-preserve-times"       , action="store_false"          , help="If set, modification times will not be preserved and instead files/folders will have time of copy/sync set as their modification time", dest="preserveTimes")
 parser.add_argument("-B", "--dont-preserve-permissions" , action="store_false"          , help="If set, permissions will not be preserved and instead files/folders will have default permissions set", dest="preservePermissions")
 parser.add_argument("-d", "--dont-close"                , action="store_true"           , help="Don't auto-close console window at the end if no error occurred. You will have to close it manually or by pressing ENTER", dest="dontClose")
 parser.add_argument("-b", "--fast-remote-listdir-attr"  , action="store_true"           , help="If you copy/sync folder(s) containing more than 5000 entries from/to remote location this may be faster. Requires Python 3 on remote host", dest="fastRemoteListdirAttr")
@@ -939,7 +939,7 @@ if REMOTE_IS_REMOTE:
 	ssh.close()
 
 if not silent:
-	print(f"\nExecution time: {time.time() - start:.3f} s")
+	print(f"\nExecution time: {time.perf_counter() - start:.3f} s")
 
 if dontClose:
 	if silent:

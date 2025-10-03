@@ -1,7 +1,7 @@
 import argparse
 import sys
 from termcolor import colored as clr
-from fnmatch import fnmatchcase, fnmatch
+from fnmatch import fnmatchcase
 from typing import Callable
 
 from commonConstants import COLOR_ERROR
@@ -27,6 +27,13 @@ class NameFilter:
 		self.matchVal = matchVal
 		self.matchingFunc = matchingFunc
 
+def fnmatchNotCase(name: str, pat: str) -> bool:
+	# In general case one would use the following:
+	# return fnmatchcase(name.lower(), pat.lower())
+
+	# In our case we skip the .lower() for pat as we will do that only once in the __call__ method
+	return fnmatchcase(name.lower(), pat)
+
 class IncludeExcludeAction(argparse.Action):
 	destDefaults = {}
 
@@ -39,7 +46,7 @@ class IncludeExcludeAction(argparse.Action):
 		longName = max(option_strings, key=len)
 
 		self.matchVal = longName.startswith("--include")
-		self.matchingFunc = fnmatchcase if longName.endswith("case") else fnmatch
+		self.matchingFunc = fnmatchcase if longName.endswith("case") else fnmatchNotCase
 
 	def __call__(self, parser, namespace, values, option_string=None):
 		# Ensure the target list exists
@@ -52,4 +59,8 @@ class IncludeExcludeAction(argparse.Action):
 			IncludeExcludeAction.destDefaults[self.dest] = self.matchVal
 
 		for pattern in values:
-			items.append(NameFilter(pattern, self.matchVal, self.matchingFunc))
+			items.append(NameFilter(
+				pattern if self.matchingFunc is fnmatchcase else pattern.lower(),
+				self.matchVal,
+				self.matchingFunc
+			))

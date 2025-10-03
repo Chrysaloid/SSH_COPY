@@ -25,12 +25,17 @@ else:
 	from getSelectedFilesFromStdIn import getSelectedFilesFromStdIn
 	print(f"\33]0;{TITLE}\a", end="", flush=True) # Hide title
 
-parser = ArgumentParser_ColoredError(description="Parse connection details")
+parser = ArgumentParser_ColoredError(description="Copies selected files (and folders recursively) in Windows Explorer or Nautilus to a folder on a remote machine.")
 
-parser.add_argument("-u", "--username"     , required=True, help="Remote username")
-parser.add_argument("-H", "--hostname"     , required=True, help="Remote host's address")
-parser.add_argument("-p", "--password"     , required=True, help="Remote password")
-parser.add_argument("-r", "--remote-folder", required=True, help="Remote folder's absolute path", dest="remoteFolder")
+required = parser.add_argument_group("Required arguments")
+parser._action_groups = [required, parser._optionals]
+
+required.add_argument("-u", "--username"     , required=True, help="Remote username")
+required.add_argument("-H", "--hostname"     , required=True, help="Remote host's address")
+required.add_argument("-p", "--password"     , required=True, help="Remote password")
+required.add_argument("-r", "--remote-folder", required=True, help="Remote folder's absolute path", dest="remoteFolder")
+
+parser._optionals.title = "Optional arguments"
 
 parser.add_argument("-P", "--port"          , default=22, type=int, help="Remote port (default: 22)")
 parser.add_argument("-T", "--timeout"       , default=1, type=float, help="TCP 3-way handshake timeout in seconds (default: 1)")
@@ -120,7 +125,7 @@ if endCommand:
 
 ssh.close()
 
-print(f"\nExecution time: {time.time() - start:.3f} s")
+print(f"Execution time: {time.time() - start:.3f} s")
 
 if exitStatus:
 	exit(exitStatus)
