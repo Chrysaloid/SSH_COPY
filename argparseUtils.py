@@ -55,8 +55,10 @@ class IncludeExcludeAction(argparse.Action):
 			items = []
 			setattr(namespace, self.dest, items)
 
+		# If --include-* argument was first - by default exclude
+		# If --exclude-* argument was first - by default include
 		if self.dest not in IncludeExcludeAction.destDefaults:
-			IncludeExcludeAction.destDefaults[self.dest] = self.matchVal
+			IncludeExcludeAction.destDefaults[self.dest] = not self.matchVal
 
 		for pattern in values:
 			items.append(NameFilter(

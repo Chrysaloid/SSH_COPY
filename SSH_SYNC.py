@@ -533,7 +533,7 @@ def recursiveRemove(
 			return
 
 		for entry in entries:
-			newPath = posixpath.join(folderPath, entry.filename)
+			newPath = posixpath.join(basePath, entry.filename)
 			if isFile(entry):
 				try:
 					removeFileFun(newPath)
@@ -677,7 +677,7 @@ def recursiveCopyHelper(
 
 			if not silent:
 				if mode == MODE.SYNC:
-					cprint(f"{relPath} - {'source -> destination' if NNS is normalNS else 'destination -> source'}", COLOR_OK)
+					cprint(f"{'source -> destination' if NNS is normalNS else 'destination -> source'}: {relPath}", COLOR_OK)
 				else: # MODE.COPY
 					cprint(relPath, COLOR_OK)
 
