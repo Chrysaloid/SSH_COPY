@@ -195,7 +195,7 @@ def preProcessFilesOrFolders(
 				pass
 
 		if not newerThanDate:
-			raise SimpleError(f'Incorrect {newerThanParamName} parameter: {newerThan}')
+			raise SimpleError(f'Incorrect {newerThanParamName} parameter: {newerThan}\nShould be in one of the formats: {", ".join(dateFormats)}')
 
 	if verbose:
 		print(f'Correctly parsed {newerThanParamName} parameter "{newerThan}" as {datetime.fromtimestamp(newerThanDate)}')
@@ -576,41 +576,47 @@ def permissionErrorHandler(err: Exception, designation: str, type: str, path: st
 	else:
 		raise err
 
-def innerFilterFun(entry: paramiko.SFTPAttributes) -> bool:
-	# ___NewerThanDate comparisons use the < operator so if the user inputs exact modification date
-	# of some file/folder that file/folder will not be included in the operations
-	return isDir (entry) and foldersNewerThanDate < entry.st_mtime and folderMatch(entry.filename) \
-	    or isFile(entry) and filesNewerThanDate   < entry.st_mtime and fileMatch  (entry.filename)
+class FilterClass:
+	def __init__(self, sourceFolderParam, sourceFolderBase, recursionOk):
+		self.sourceFolderParam = sourceFolderParam
+		self.sourceFolderBase = sourceFolderBase
+		self.recursionOk = recursionOk
 
-if verbose:
-	class FilterClass:
-		def __init__(self, sourceFolderParam, sourceFolderBase):
-			self.sourceFolderParam = sourceFolderParam
-			self.sourceFolderBase = sourceFolderBase
-		def __call__(self, entry: paramiko.SFTPAttributes) -> bool:
-			val = innerFilterFun(entry)
+	def _innerFilterFun(self, entry: paramiko.SFTPAttributes) -> bool:
+		# ___NewerThanDate comparisons use the < operator so if the user inputs exact modification date
+		# of some file/folder that file/folder will not be included in the operations
+		return isFile(entry)                      and filesNewerThanDate   < entry.st_mtime and fileMatch  (entry.filename) \
+		    or isDir (entry) and self.recursionOk and foldersNewerThanDate < entry.st_mtime and folderMatch(entry.filename)
 
-			if not val:
-				name = entry.filename
-				relPath = posixpath.join(self.sourceFolderParam, name).replace(self.sourceFolderBase, "", 1)
-				if isDir(entry):
-					if not (foldersNewerThanDate <= entry.st_mtime):
-						print(f'{relPath} - skipping because it ({modifiedDate(entry)}) is not newer than -f/--folders-newer-than parameter')
-					elif not folderMatch(name):
-						print(f"{relPath} - skipping because folderMatch returned False")
-					else:
-						cprint(f"{relPath} - skipping file because of unknown reason", COLOR_ERROR) # Shouldn't happen
-				elif isFile(entry):
-					if not (filesNewerThanDate <= entry.st_mtime):
-						print(f'{relPath} - skipping because it ({modifiedDate(entry)}) is not newer than -n/--files-newer-than parameter')
-					elif not fileMatch(name):
-						print(f"{relPath} - skipping because fileMatch returned False")
-					else:
-						cprint(f"{relPath} - skipping file because of unknown reason", COLOR_ERROR) # Shouldn't happen
+	def __call__(self, entry: paramiko.SFTPAttributes) -> bool:
+		val = self._innerFilterFun(entry)
+
+		if not val:
+			name = entry.filename
+			relPath = posixpath.join(self.sourceFolderParam, name).replace(self.sourceFolderBase, "", 1)
+			if isFile(entry):
+				if not (filesNewerThanDate <= entry.st_mtime):
+					print(f'{relPath} - skipping file because it ({modifiedDate(entry)}) is not newer than -n/--files-newer-than parameter')
+				elif not fileMatch(name):
+					print(f"{relPath} - skipping file because fileMatch returned False")
 				else:
-					print(f"{relPath} - skipping because it is not a file nor folder")
+					cprint(f"{relPath} - skipping file because of unknown reason", COLOR_ERROR) # Shouldn't happen
+			elif isDir(entry):
+				if not self.recursionOk:
+					print(f"{relPath} - skipping folder because we are at max recursion depth and createMaxRecFolders is False")
+				elif not (foldersNewerThanDate <= entry.st_mtime):
+					print(f'{relPath} - skipping folder because it ({modifiedDate(entry)}) is not newer than -f/--folders-newer-than parameter')
+				elif not folderMatch(name):
+					print(f"{relPath} - skipping folder because folderMatch returned False")
+				else:
+					cprint(f"{relPath} - skipping folder because of unknown reason", COLOR_ERROR) # Shouldn't happen
+			else:
+				print(f"{relPath} - skipping because it is not a file nor folder")
 
-			return val
+		return val
+
+if not verbose:
+	FilterClass.__call__ = FilterClass._innerFilterFun
 
 def checkCaseDuplicates(
 	entriesList: list[paramiko.SFTPAttributes],
@@ -697,7 +703,7 @@ def recursiveCopyHelper(
 				print(f"{relPath} - skipping file because it is not newer than the {NNS.dest_str}")
 			else:
 				cprint(f"{relPath} - skipping file because of unknown reason", COLOR_ERROR) # Shouldn't happen
-	elif isDir(sourceEntry) and (depth < maxRecursionDepth or createMaxRecFolders):
+	elif isDir(sourceEntry):
 		if destEntry and isFile(destEntry):
 			fileOnFolderErrorHandler(sourceEntry)
 			return ACTION.CONTINUE
@@ -729,11 +735,6 @@ def recursiveCopyHelper(
 				print(f"{relPath} - skipping file because it ({modifiedDate(sourceEntry)}) is not newer than newestDestDate")
 			else:
 				cprint(f"{relPath} - skipping file because of unknown reason", COLOR_ERROR) # Shouldn't happen
-		elif isDir(sourceEntry):
-			if not (depth < maxRecursionDepth or createMaxRecFolders):
-				print(f"{relPath} - skipping folder because it we are at max recursion depth and createMaxRecFolders is False")
-			else:
-				cprint(f"{relPath} - skipping file because of unknown reason", COLOR_ERROR) # Shouldn't happen
 
 	return ACTION.NONE
 
@@ -747,9 +748,8 @@ def recursiveCopy(
 	if verbose:
 		print(f"{ENTERING_OK} {NNS.source_designation_padded} source      folder: {sourceFolderParam}")
 		print(f"{ENTERING_OK} {NNS.dest_designation_padded  } destination folder: {destFolderParam}")
-		filterFun = FilterClass(sourceFolderParam, NNS.sourceFolderBase)
-	else:
-		filterFun = innerFilterFun
+
+	filterFun = FilterClass(sourceFolderParam, NNS.sourceFolderBase, recursionOk = depth < maxRecursionDepth or createMaxRecFolders)
 
 	match mode:
 		case MODE.COPY:
@@ -784,7 +784,7 @@ def recursiveCopy(
 					cprint("Warning: When searching for newest file in the destination folder you may have excluded some files/folders case-sensitivly but the destination folder is case-insensitive", COLOR_WARN)
 
 				entryCount = 0
-				for entry in (filter(innerFilterFun, destEntries) if filterDest else destEntries):
+				for entry in (filter(filterFun._innerFilterFun, destEntries) if filterDest else destEntries):
 					if newerThanNewestFile and isFile(entry) or newerThanNewestFolder and isDir(entry):
 						entryCount += 1
 						if newestDestDate < entry.st_mtime:
@@ -796,16 +796,14 @@ def recursiveCopy(
 					theNewest = f"and the newest from them has date {datetime.fromtimestamp(newestDestDate)} -> newestDestDate" if entryCount else ""
 					print(f"Destination folder has {entryCount}{matching} {filesFolders} {theNewest}")
 
-			# Explanation for following if staments containing destCaseSense:
+			# Explanation for following if stament containing destCaseSense:
 			# sourceCaseSense and destCaseSense: (i.e. Linux -> Linux) Both are case-sensitive so no need to normalize case
 			# sourceCaseSense and not destCaseSense: (i.e. Linux -> Windows) Case normalization necessary as Windows is case-insensitive
 			# not sourceCaseSense and destCaseSense: (i.e. Windows -> Linux) No need to normalize case as case-insensitive names are a subset of case-sensitive names
 			# not sourceCaseSense and not destCaseSense: (i.e. Windows -> Windows) Case normalization necessary as both are case-insensitive
 			# So we can se that case normalization is only necessary if not destCaseSense
-			if destCaseSense:
-				destEntriesDict = {entry.filename: entry for entry in destEntries}
-			else:
-				destEntriesDict = {entry.filename.lower(): entry for entry in destEntries}
+			if destCaseSense: destEntriesDict = {entry.filename        : entry for entry in destEntries}
+			else            : destEntriesDict = {entry.filename.lower(): entry for entry in destEntries}
 
 			for sourceEntry in sourceEntries:
 				name = sourceEntry.filename
@@ -875,8 +873,10 @@ def recursiveCopy(
 
 			for sourceEntry, destEntry, name in allEntries:
 				# When sourceEntry is None sourceEntryBase might not be None (because i.e. folders where
-				# filetered out). That's why we need to get it from the dict and check it. The same
+				# filetered out or entries where filtered case-sensitively while the folders are
+				# case-insensitive). That's why we need to get it from the dict and check it. The same
 				# applies to destEntry and destEntryBase.
+
 				# When sourceEntry is not None and sourceEntryBase is not None then they should refer to
 				# the same object so sourceEntry is sourceEntryBase == True
 				sourceEntryBase = sourceEntriesDictBase.get(name)
