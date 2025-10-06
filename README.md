@@ -1,4 +1,4 @@
-# SSH_COPY - 1.1.5
+# SSH_COPY - 1.2.0
 Small collection of Python scripts to easily copy files between devices in the same local network. You must set up DHCP (static IP addresses) in your router settings otherwise the scripts won't work as their setup relies on hardcoded (by You) addresses in the shortcuts or wrapper scripts.
 
 ## Initial setup
@@ -121,13 +121,11 @@ Good example usage for the `sync` mode is maintaining a synchronized music libra
 **Full help output:**
 
 ```
-usage: SSH_SYNC.py [-h] -l ABSOLUTE_PATH -r ABSOLUTE_PATH [-i [PATTERN_1 [PATTERN_2 ...]]]
-                   [-e [PATTERN_1 [PATTERN_2 ...]]] [-c [PATTERN_1 [PATTERN_2 ...]]]
-                   [-a [PATTERN_1 [PATTERN_2 ...]]] [-I [PATTERN_1 [PATTERN_2 ...]]]
-                   [-E [PATTERN_1 [PATTERN_2 ...]]] [-C [PATTERN_1 [PATTERN_2 ...]]]
-                   [-A [PATTERN_1 [PATTERN_2 ...]]] [-u USERNAME] [-H HOSTNAME] [-p PASSWORD] [-P PORT]
-                   [-T SECONDS] [-n DATE] [-f DATE] [-R [MAX_RECURSION_DEPTH]] [-S] [-x] [-v] [-s] [-t] [-B] [-d]
-                   [-b] [-k] [-K] [-L] [-G] [-m {sync,copy}] [-F] [-N] [-M] [-D]
+usage: SSH_SYNC.py [-h] -l ABSOLUTE_PATH -r ABSOLUTE_PATH [-i [PATTERN_1 [PATTERN_2 ...]]] [-e [PATTERN_1 [PATTERN_2 ...]]]
+                   [-c [PATTERN_1 [PATTERN_2 ...]]] [-a [PATTERN_1 [PATTERN_2 ...]]] [-I [PATTERN_1 [PATTERN_2 ...]]]
+                   [-E [PATTERN_1 [PATTERN_2 ...]]] [-C [PATTERN_1 [PATTERN_2 ...]]] [-A [PATTERN_1 [PATTERN_2 ...]]] [-u USERNAME]
+                   [-H HOSTNAME] [-p PASSWORD] [-P PORT] [-T SECONDS] [-n DATE] [-f DATE] [-R [MAX_RECURSION_DEPTH]] [-S] [-x] [-v]
+                   [-s] [-t] [-B] [-d] [-b] [-k] [-K] [-L] [-G] [-m {sync,copy}] [-F] [-N] [-M] [-D] [-g [FORMAT]]
 
 Copy or sync files between folders on remote or local machines
 
@@ -169,38 +167,36 @@ Optional common arguments:
   -f, --folders-newer-than DATE
                         Copy/Sync only folders newer then this date
   -R, --recursive [MAX_RECURSION_DEPTH]
-                        Recurse into subdirectories. Optionaly takes max recursion depth as parameter. The source
-                        and destination folders are considered as depth == 0 so specifying "--recursive 0" is the
-                        same as not specyfying it at all
+                        Recurse into subdirectories. Optionaly takes max recursion depth as parameter. The source and destination
+                        folders are considered as depth == 0 so specifying "--recursive 0" is the same as not specyfying it at all
   -S, --create-dest-folder
-                        If destination folder doesn't exists, create it and all its parents (like mkdir (-p on
-                        Linux)). If not set terminate the script if the folder doesn't exist
+                        If destination folder doesn't exists, create it and all its parents (like mkdir (-p on Linux)). If not set
+                        terminate the script if the folder doesn't exist
   -x, --create-max-rec-folders
                         Create empty folders at max recursion depth
   -v, --verbose         Print verbose information. Good for debugging
   -s, --silent          Print only errors
   -t, --dont-preserve-times
-                        If set, modification times will not be preserved and instead files/folders will have
-                        time of copy/sync set as their modification time
+                        If set, modification times will not be preserved and instead files/folders will have time of copy/sync set as
+                        their modification time
   -B, --dont-preserve-permissions
-                        If set, permissions will not be preserved and instead files/folders will have default
-                        permissions set
-  -d, --dont-close      Don't auto-close console window at the end if no error occurred. You will have to close it
-                        manually or by pressing ENTER
+                        If set, permissions will not be preserved and instead files/folders will have default permissions set
+  -d, --dont-close      Don't auto-close console window at the end if no error occurred. You will have to close it manually or by
+                        pressing ENTER
   -b, --fast-remote-listdir-attr
-                        If you copy/sync folder(s) containing more than 5000 entries from/to remote location this
-                        may be faster. Requires Python 3 on remote host
+                        If you copy/sync folder(s) containing more than 5000 entries from/to remote location this may be faster.
+                        Requires Python 3 on remote host
   -k, --listdir-attr-fallback
-                        Instead of terminating the script if remote does not have Python 3, fall back to "slow"
-                        listdir-attr. Only applicable if -b/--fast-remote-listdir-attr was set
+                        Instead of terminating the script if remote does not have Python 3, fall back to "slow" listdir-attr. Only
+                        applicable if -b/--fast-remote-listdir-attr was set
   -K, --end-on-inaccessible-entry
-                        Terminate the script if it does not have enough perrmisions to access any encountered
-                        file/folder (local or remote). If not set ignore such cases but print a warning
+                        Terminate the script if it does not have enough perrmisions to access any encountered file/folder (local or
+                        remote). If not set ignore such cases but print a warning
   -L, --end-on-file-onto-folder
-                        Terminate the script if a file is to be copied onto a folder and vice versa. If not set
-                        ignore such cases but print a warning
-  -G, --sort-entries    Sort files/folders by name alphabetically before copying. Except for making the logs look
-                        more familiar it does not have much other use cases
+                        Terminate the script if a file is to be copied onto a folder and vice versa. If not set ignore such cases but
+                        print a warning
+  -G, --sort-entries    Sort files/folders by name alphabetically before copying. Except for making the logs look more familiar it
+                        does not have much other use cases
   -m, --mode {sync,copy}
                         One of values: sync,copy (Default: copy)
 
@@ -212,6 +208,11 @@ COPY mode arguments:
                         Copy only files newer then the newest folder in the destination folder
   -D, --dont-filter-dest
                         Don't filter the destination files/folders WHEN SEARCHING FOR THE NEWEST FILE
+
+SYNC mode arguments:
+  -g, --print-common-date [FORMAT]
+                        Before printing file transfers print the detected newest common date. Optionaly take date format string as
+                        paremeter
 ```
 
 **Arguments that need more explanation:**

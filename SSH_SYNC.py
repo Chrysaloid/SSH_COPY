@@ -33,6 +33,7 @@ from LocalSFTPAttributes import local_listdir_attr
 from isFolderCaseSensitive import isFolderCaseSensitive as isLocalFolderCaseSensitive
 from commonConstants import COLOR_OK, COLOR_ERROR, COLOR_WARN, COLOR_EMPHASIS
 from argparseUtils import ArgumentParser_ColoredError, NoRepeatAction, NameFilter, IncludeExcludeAction
+from printRelTime import printRelTime
 # endregion
 
 TITLE = "SSH SYNC"
@@ -90,7 +91,7 @@ parser.add_argument("-P", "--port"                      , default=22, type=int  
 parser.add_argument("-T", "--timeout"                   , default=5, type=float         , help="TCP 3-way handshake timeout in seconds (default: 5)", metavar="SECONDS")
 parser.add_argument("-n", "--files-newer-than"          , default=""                    , help="Copy/Sync only files newer then this date"  , dest="filesNewerThan"  , metavar="DATE")
 parser.add_argument("-f", "--folders-newer-than"        , default=""                    , help="Copy/Sync only folders newer then this date", dest="foldersNewerThan", metavar="DATE")
-parser.add_argument("-R", "--recursive"                 , default=0, nargs="?", type=int, help='Recurse into subdirectories. Optionaly takes max recursion depth as parameter. The source and destination folders are considered as depth == 0 so specifying "--recursive 0" is the same as not specyfying it at all', dest="maxRecursionDepth", metavar="MAX_RECURSION_DEPTH")
+parser.add_argument("-R", "--recursive"                 , const=sys.maxsize, nargs="?", type=int, help='Recurse into subdirectories. Optionaly takes max recursion depth as parameter. The source and destination folders are considered as depth == 0 so specifying "--recursive 0" is the same as not specyfying it at all', dest="maxRecursionDepth", metavar="MAX_RECURSION_DEPTH")
 parser.add_argument("-S", "--create-dest-folder"        , action="store_true"           , help="If destination folder doesn't exists, create it and all its parents (like mkdir (-p on Linux)). If not set terminate the script if the folder doesn't exist", dest="createDestFolder")
 parser.add_argument("-x", "--create-max-rec-folders"    , action="store_true"           , help="Create empty folders at max recursion depth", dest="createMaxRecFolders")
 parser.add_argument("-v", "--verbose"                   , action="store_true"           , help="Print verbose information. Good for debugging")
@@ -113,7 +114,8 @@ copyMode.add_argument("-N", "--newer-than-newest-file"  , action="store_true" , 
 copyMode.add_argument("-M", "--newer-than-newest-folder", action="store_true" , help="Copy only files newer then the newest folder in the destination folder", dest="newerThanNewestFolder")
 copyMode.add_argument("-D", "--dont-filter-dest"        , action="store_false", help="Don't filter the destination files/folders WHEN SEARCHING FOR THE NEWEST FILE", dest="filterDest")
 
-# syncMode = parser.add_argument_group("SYNC mode arguments")
+syncMode = parser.add_argument_group("SYNC mode arguments")
+syncMode.add_argument("-g", "--print-common-date", const="%Y-%m-%d %H:%M:%S - {rel}", nargs="?", help="Before printing file transfers print the detected newest common date. Optionaly take date format string as paremeter", dest="printCommonDate", metavar="FORMAT")
 
 args = parser.parse_args()
 
@@ -146,19 +148,19 @@ listdirAttrFallback    : bool               = args.listdirAttrFallback
 endOnInaccessibleEntry : bool               = args.endOnInaccessibleEntry
 endOnFileOntoFolder    : bool               = args.endOnFileOntoFolder
 sortEntries            : bool               = args.sortEntries
+printCommonDate        : str                = args.printCommonDate
 # dryRun                 : bool               = args.dryRun
 # endregion
 
 # region #* PARAMETER VALIDATION
 mode: int = getMode(mode)
 
-if maxRecursionDepth is None: # Argument with no parameter mean no recursion limit
-	maxRecursionDepth = sys.maxsize
-elif maxRecursionDepth < 0:
-	raise SimpleError("-R/--recursive option's parameter cannot be negative")
-elif maxRecursionDepth == 0: # -R/--recursive was not specified at all
+if maxRecursionDepth is None: # -R/--recursive was not specified at all
+	maxRecursionDepth = 0
 	if (inExcludeFolders or foldersNewerThan) and not createMaxRecFolders and not silent:
 		cprint("Warning: Folder filtering options don't work if -R/--recursive or -x/--create-max-rec-folders was not specified", COLOR_WARN)
+elif maxRecursionDepth < 0:
+	raise SimpleError("-R/--recursive option's parameter cannot be negative")
 
 if any((username, hostname, password)) and not all((username, hostname, password)):
 	raise SimpleError("If any of the parameters -u/--username, -H/--hostname, -p/--password is specified then all of them must be specified")
@@ -870,6 +872,9 @@ def recursiveCopy(
 				if sourceEntry and destEntry and sourceEntry.st_mtime == destEntry.st_mtime:
 					if newestCommonDate < sourceEntry.st_mtime:
 						newestCommonDate = sourceEntry.st_mtime
+
+			if printCommonDate and not silent:
+				print(f".{sourceFolderParam.replace(NNS.sourceFolderBase, "", 1) or "/"}: Newest common date: {datetime.fromtimestamp(newestCommonDate).strftime(printCommonDate).format(rel = printRelTime(newestCommonDate))}")
 
 			for sourceEntry, destEntry, name in allEntries:
 				# When sourceEntry is None sourceEntryBase might not be None (because i.e. folders where
