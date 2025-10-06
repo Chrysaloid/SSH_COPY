@@ -12,7 +12,7 @@ from sshUtils import getSSH, assertRemoteFolderExists, remoteMkdir
 from getPlatform import WINDOWS
 from fileUtils import isFile, isDir
 from commonConstants import COLOR_OK, COLOR_ERROR, COLOR_WARN, COLOR_ERROR_BACK
-from argparseUtils import ArgumentParser_ColoredError
+from argparseUtils import ArgumentParser_ColoredError, COMMON_FORMATTER_CLASS
 
 TITLE = "SSH SEND"
 
@@ -25,7 +25,10 @@ else:
 	from getSelectedFilesFromStdIn import getSelectedFilesFromStdIn
 	print(f"\33]0;{TITLE}\a", end="", flush=True) # Hide title
 
-parser = ArgumentParser_ColoredError(description="Copies selected files (and folders recursively) in Windows Explorer or Nautilus to a folder on a remote machine.")
+parser = ArgumentParser_ColoredError(
+	description="Copies selected files (and folders recursively) in Windows Explorer or Nautilus to a folder on a remote machine.",
+	formatter_class=COMMON_FORMATTER_CLASS,
+)
 
 required = parser.add_argument_group("Required arguments")
 parser._action_groups = [required, parser._optionals]

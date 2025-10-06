@@ -32,7 +32,7 @@ from fileUtils import isFile, isDir, modifiedDate, assertFolderExists, ensureFol
 from LocalSFTPAttributes import local_listdir_attr
 from isFolderCaseSensitive import isFolderCaseSensitive as isLocalFolderCaseSensitive
 from commonConstants import COLOR_OK, COLOR_ERROR, COLOR_WARN, COLOR_EMPHASIS
-from argparseUtils import ArgumentParser_ColoredError, NoRepeatAction, NameFilter, IncludeExcludeAction
+from argparseUtils import ArgumentParser_ColoredError, NoRepeatAction, NameFilter, IncludeExcludeAction, COMMON_FORMATTER_CLASS
 from printRelTime import printRelTime
 # endregion
 
@@ -48,7 +48,10 @@ else:
 	print(f"\33]0;{TITLE}\a", end="", flush=True) # Hide title
 
 # region #* PARAMETER PARSING
-parser = ArgumentParser_ColoredError(description="Copy or sync files between folders on remote or local machines")
+parser = ArgumentParser_ColoredError(
+	description="Copy or sync files between folders on remote or local machines",
+	formatter_class=COMMON_FORMATTER_CLASS,
+)
 
 required = parser.add_argument_group("Required arguments")
 parser._action_groups = [required, parser._optionals]
@@ -106,7 +109,7 @@ parser.add_argument("-L", "--end-on-file-onto-folder"   , action="store_true"   
 parser.add_argument("-G", "--sort-entries"              , action="store_true"           , help="Sort files/folders by name alphabetically before copying. Except for making the logs look more familiar it does not have much other use cases", dest="sortEntries")
 # parser.add_argument("-u", "--dry-run"                   , action="store_true"           , help="Only create directories and disable all file copying operations and only print the output that would normally get printed", dest="dryRun")
 
-parser.add_argument("-m", "--mode", default="copy", choices=MODE_DICT.keys(), type=str.lower, help=f'One of values: {",".join(MODE_DICT.keys())} (Default: copy)')
+parser.add_argument("-m", "--mode", default="copy", choices=MODE_DICT.keys(), type=str.lower, help=f'One of values: {",".join(MODE_DICT.keys())} (default: copy)')
 
 copyMode = parser.add_argument_group("COPY mode arguments")
 copyMode.add_argument("-F", "--force"                   , action="store_true" , help="Force copying of source files even if they are older then destination files", dest="force")
@@ -115,7 +118,8 @@ copyMode.add_argument("-M", "--newer-than-newest-folder", action="store_true" , 
 copyMode.add_argument("-D", "--dont-filter-dest"        , action="store_false", help="Don't filter the destination files/folders WHEN SEARCHING FOR THE NEWEST FILE", dest="filterDest")
 
 syncMode = parser.add_argument_group("SYNC mode arguments")
-syncMode.add_argument("-g", "--print-common-date", const="%Y-%m-%d %H:%M:%S - {rel}", nargs="?", help="Before printing file transfers print the detected newest common date. Optionaly take date format string as paremeter", dest="printCommonDate", metavar="FORMAT")
+syncMode.add_argument("-g", "--print-common-date"       , const="%Y-%m-%d %H:%M - {rel}", nargs="?", help='Before printing file transfers print the detected newest common date. Optionaly take date format string as parameter (default: "%(const)s")', dest="printCommonDate", metavar="FORMAT")
+syncMode.add_argument("-j", "--common-date-from-folders", action="store_true"                      , help="Include folders when searching for newest common date", dest="commonDateFromFolders")
 
 args = parser.parse_args()
 
@@ -149,6 +153,7 @@ endOnInaccessibleEntry : bool               = args.endOnInaccessibleEntry
 endOnFileOntoFolder    : bool               = args.endOnFileOntoFolder
 sortEntries            : bool               = args.sortEntries
 printCommonDate        : str                = args.printCommonDate
+commonDateFromFolders  : bool               = args.commonDateFromFolders
 # dryRun                 : bool               = args.dryRun
 # endregion
 
@@ -868,13 +873,14 @@ def recursiveCopy(
 			for name in allNames:
 				sourceEntry = sourceEntriesDict.get(name)
 				destEntry   = destEntriesDict  .get(name)
-				allEntries.append((sourceEntry, destEntry, name))
-				if sourceEntry and destEntry and sourceEntry.st_mtime == destEntry.st_mtime:
+				allEntries.append((sourceEntry, destEntry, name)) # We save the name because it might have been .lower()ed
+				if sourceEntry and destEntry and (isFile(sourceEntry) or commonDateFromFolders and isDir(sourceEntry)) and sourceEntry.st_mtime == destEntry.st_mtime:
 					if newestCommonDate < sourceEntry.st_mtime:
 						newestCommonDate = sourceEntry.st_mtime
 
 			if printCommonDate and not silent:
-				print(f".{sourceFolderParam.replace(NNS.sourceFolderBase, "", 1) or "/"}: Newest common date: {datetime.fromtimestamp(newestCommonDate).strftime(printCommonDate).format(rel = printRelTime(newestCommonDate))}")
+				print(f".{sourceFolderParam.replace(NNS.sourceFolderBase, "", 1) or "/"}: Newest common date: { \
+					datetime.fromtimestamp(newestCommonDate).strftime(printCommonDate).format(rel = printRelTime(newestCommonDate))}")
 
 			for sourceEntry, destEntry, name in allEntries:
 				# When sourceEntry is None sourceEntryBase might not be None (because i.e. folders where

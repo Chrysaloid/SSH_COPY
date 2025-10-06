@@ -6,6 +6,8 @@ from typing import Callable
 
 from commonConstants import COLOR_ERROR
 
+COMMON_FORMATTER_CLASS = lambda prog: argparse.HelpFormatter(prog, max_help_position=30, width=100)
+
 class ArgumentParser_ColoredError(argparse.ArgumentParser):
 	def __init__(self, *args, errorColor=COLOR_ERROR, **kwargs):
 		super().__init__(*args, **kwargs)
