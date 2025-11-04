@@ -89,7 +89,8 @@ parser.add_argument("-C", "--include-folders-case", default=[], action=IncludeEx
 parser.add_argument("-A", "--exclude-folders-case", default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for folders to exclude in copy/sync (case-sensitive)", dest="inExcludeFolders", metavar=("PATTERN_1", "PATTERN_2"))
 parser.add_argument("-u", "--username"                  , default=""                    , help="Remote username")
 parser.add_argument("-H", "--hostname"                  , default=""                    , help="Remote host's address")
-parser.add_argument("-p", "--password"                  , default=""                    , help="Remote password")
+parser.add_argument("-p", "--password"                  , default=None                  , help="Remote password")
+parser.add_argument("-y", "--key-filename"              , default=[], action="extend"   , nargs="+", type=str, help="Path to local OpenSSH private-key", dest="keyFilename", metavar="KEY_FILENAME")
 parser.add_argument("-P", "--port"                      , default=22, type=int          , help="Remote port (default: 22)")
 parser.add_argument("-T", "--timeout"                   , default=5, type=float         , help="TCP 3-way handshake timeout in seconds (default: 5)", metavar="SECONDS")
 parser.add_argument("-n", "--files-newer-than"          , default=""                    , help="Copy/Sync only files newer then this date"  , dest="filesNewerThan"  , metavar="DATE")
@@ -126,6 +127,7 @@ args = parser.parse_args()
 username               : str                = args.username
 hostname               : str                = args.hostname
 password               : str                = args.password
+keyFilename            : list  [str]        = args.keyFilename
 localFolder            : str                = args.localFolder
 remoteFolder           : str                = args.remoteFolder
 inExcludeFiles         : list  [NameFilter] = args.inExcludeFiles
@@ -167,8 +169,8 @@ if maxRecursionDepth is None: # -R/--recursive was not specified at all
 elif maxRecursionDepth < 0:
 	raise SimpleError("-R/--recursive option's parameter cannot be negative")
 
-if any((username, hostname, password)) and not all((username, hostname, password)):
-	raise SimpleError("If any of the parameters -u/--username, -H/--hostname, -p/--password is specified then all of them must be specified")
+if (username or hostname) and not (username and hostname):
+	raise SimpleError("If any of the parameters -u/--username, -H/--hostname is specified then all of them must be specified")
 REMOTE_IS_REMOTE = bool(username)
 
 if silent and verbose:
@@ -281,7 +283,7 @@ def isFolderCaseSensitiveBase(
 	return (errorOccured, caseSense)
 
 if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
-	ssh = getSSH(username, hostname, password, timeout, port, silent)
+	ssh = getSSH(username, hostname, password, keyFilename, timeout, port, silent)
 	sftp = ssh.open_sftp()
 
 	# Verifying remote folder

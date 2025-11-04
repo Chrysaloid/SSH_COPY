@@ -12,7 +12,7 @@ from SimpleError import SimpleError
 from fileUtils import isDir, iteratePathParts
 from LocalSFTPAttributes import LocalSFTPAttributes
 
-def getSSH(username: str, hostname: str, password: str, TIMEOUT: float = 5, port = 22, silent = False):
+def getSSH(username: str, hostname: str, password: str, keyFilename: str = None, TIMEOUT: float = 5, port = 22, silent = False):
 	ssh = paramiko.SSHClient()
 	ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -20,7 +20,7 @@ def getSSH(username: str, hostname: str, password: str, TIMEOUT: float = 5, port
 	try:
 		if not silent:
 			print(f"Attempting to connect to {clr(username, 'green')}@{clr(hostname, 'green')} ...")
-		ssh.connect(hostname, username=username, password=password, timeout=TIMEOUT, port=port)
+		ssh.connect(hostname, username=username, password=password, key_filename=keyFilename, timeout=TIMEOUT, port=port)
 	except BadHostKeyException:
 		errorMessage = f"ERROR: The server's host key could not be verified for {hostname}"
 	except AuthenticationException:

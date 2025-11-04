@@ -1,4 +1,4 @@
-# SSH_COPY - 1.3.0
+# SSH_COPY - 1.4.0
 Small collection of Python scripts to easily copy files between devices in the same local network. You must set up DHCP (static IP addresses) in your router settings otherwise the scripts won't work as their setup relies on hardcoded (by You) addresses in the shortcuts or wrapper scripts.
 
 ## Initial setup
@@ -117,7 +117,7 @@ Good example usage for the `sync` mode is maintaining a synchronized music libra
 
 **Basic usage:**
 
-Since you'd be running this not too often and the setup can get pretty big I suggest creating a script for this command. Simple but easily expandable example scripts were supplied: `ssh-sync.bat` for Windows and `ssh-sync.sh` for Linux.
+Since you'd be running this not too often and the setup can get pretty big I suggest creating a script for this command. Simple but easily expandable example scripts were supplied: `ssh-sync.bat` for Windows and `ssh-sync.sh` for Linux. Main advantage of the format of those files (so 1 argument per line) is that if you open that file in an IDE, you can do many things with the lines easily: comment them out, uncomment them, move them around, delete them.
 
 **Full help output:**
 
@@ -127,9 +127,9 @@ usage: SSH_SYNC.py [-h] -l ABSOLUTE_PATH -r ABSOLUTE_PATH [-i [PATTERN_1 [PATTER
                    [-a [PATTERN_1 [PATTERN_2 ...]]] [-I [PATTERN_1 [PATTERN_2 ...]]]
                    [-E [PATTERN_1 [PATTERN_2 ...]]] [-C [PATTERN_1 [PATTERN_2 ...]]]
                    [-A [PATTERN_1 [PATTERN_2 ...]]] [-u USERNAME] [-H HOSTNAME] [-p PASSWORD]
-                   [-P PORT] [-T SECONDS] [-n DATE] [-f DATE] [-R [MAX_RECURSION_DEPTH]] [-S] [-x]
-                   [-v] [-s] [-t] [-B] [-d] [-b] [-k] [-K] [-L] [-G] [-m {sync,copy}] [-F] [-N] [-M]
-                   [-D] [-g [FORMAT]] [-j]
+                   [-y KEY_FILENAME [KEY_FILENAME ...]] [-P PORT] [-T SECONDS] [-n DATE] [-f DATE]
+                   [-R [MAX_RECURSION_DEPTH]] [-S] [-x] [-v] [-s] [-t] [-B] [-d] [-b] [-k] [-K] [-L]
+                   [-G] [-m {sync,copy}] [-F] [-N] [-M] [-D] [-g [FORMAT]] [-j]
 
 Copy or sync files between folders on remote or local machines
 
@@ -160,6 +160,8 @@ Optional common arguments:
   -u, --username USERNAME     Remote username
   -H, --hostname HOSTNAME     Remote host's address
   -p, --password PASSWORD     Remote password
+  -y, --key-filename KEY_FILENAME [KEY_FILENAME ...]
+                              Path to local OpenSSH private-key
   -P, --port PORT             Remote port (default: 22)
   -T, --timeout SECONDS       TCP 3-way handshake timeout in seconds (default: 5)
   -n, --files-newer-than DATE
@@ -218,15 +220,15 @@ COPY mode arguments:
 SYNC mode arguments:
   -g, --print-common-date [FORMAT]
                               Before printing file transfers print the detected newest common date.
-                              Optionaly take date format string as parameter
-										(default: "%Y-%m-%d %H:%M - {rel}")
+                              Optionaly take date format string as parameter (default: "%Y-%m-%d
+                              %H:%M - {rel}")
   -j, --common-date-from-folders
                               Include folders when searching for newest common date
 ```
 
 **Arguments that need more explanation:**
 
-- `--include-*` and `--exclude-*` arguments - They allow for fine-grained file/folder selection. They use only the file/folder name for matching. They use Unix filename pattern matching provided by the [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) module. You can pass multiple parameters at a time and you can specify those arguments multiple times. Each of these will be checked in order they were passed and first one that matches the given filename will take effect. If the first argument of this kind is a `--include-*` argument by default all files will be excluded. Analogically if the first argument of this kind is a `--exclude-*` argument by default all files will be included. When none of those arguments is specified all files are included by default. I made it work that way as I think it's quite intuitive - if you just `--include-*` something you probably want to just copy that and nothing else and if just `--exclude-*` something you probably want to copy everything except that. Some examples:
+- `--include-*` and `--exclude-*` arguments - They allow for fine-grained file/folder selection. They use only the file/folder name for matching. They use Unix filename pattern matching provided by the [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) module. You can pass multiple parameters at a time and you can specify those arguments multiple times. Each of these will be checked in order they were passed and first one that matches the given filename will take effect. If the first argument of this kind is a `--include-*` argument by default all files will be excluded. Analogically if the first argument of this kind is a `--exclude-*` argument by default all files will be included. When none of those arguments is specified all files are included by default. I made it work that way as I think it's quite intuitive - if you just `--include-*` something you probably want to just copy that and nothing else and if you just `--exclude-*` something you probably want to copy everything except that. Some examples:
 
 	- `--include-files *.mp3` - Only copy MP3 files and nothing else.
 
@@ -245,6 +247,9 @@ SYNC mode arguments:
 - `--print-common-date` - The FORMAT first goes trough [datetime.strftime](https://docs.python.org/3/library/datetime.html#datetime.datetime.strftime) so you'd like to look at the [format codes](https://docs.python.org/3/library/datetime.html#format-codes). Then the `{rel}` gets replaced with the relative time to the date.
 
 - `--common-date-from-folders` - By default only files in the respective folders are searched for the newest common date. That is to prevent changes in subfolders from affecting that date in the given folder as **creation, deletion or renaming of a file in a subfolder will update it's modification date**. This argument makes **included** subfolders' modification dates to be considered as well. If recursion is disabled this argument has no effect.
+
+- `--key-filename` - Works the same as the [`SSHClient.connect()`](https://docs.paramiko.org/en/stable/api/client.html#paramiko.client.SSHClient.connect)'s `key_filename` parameter so it *"may contain OpenSSH public certificate paths as well as regular private-key paths; when files ending in -cert.pub are found, they are assumed to match a private key, and both components will be loaded. (The private key itself does not need to be listed in key_filename for this to occur - just the certificate)"*. You can pass multiple values split among multpiple arguments i.e.:
+	- `--key-filename /path/one /path/two --key-filename /path/three`
 
 **Example of successful output in `copy` mode:**
 
