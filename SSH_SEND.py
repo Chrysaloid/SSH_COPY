@@ -41,7 +41,7 @@ required.add_argument("-r", "--remote-folder", required=True, help="Remote folde
 parser._optionals.title = "Optional arguments"
 
 parser.add_argument("-P", "--port"          , default=22, type=int, help="Remote port (default: 22)")
-parser.add_argument("-T", "--timeout"       , default=1, type=float, help="TCP 3-way handshake timeout in seconds (default: 1)")
+parser.add_argument("-T", "--timeout"       , default=5, type=float, help="TCP 3-way handshake timeout in seconds (default: 5)", metavar="SECONDS")
 parser.add_argument("-t", "--preserve-times", action="store_true" , help="If set, modification times will be preserved", dest="preserveTimes")
 parser.add_argument("-0", "--zero-file"     , action="store_true" , help="Create a file named 0 at the end of transfer. Useful for file-watching scripts on the remote machine", dest="zeroFile")
 parser.add_argument("-c", "--end-command"   , help="Command to run on the remote machine after file transfer", dest="endCommand")
@@ -63,7 +63,13 @@ dontClose     : bool  = args.dontClose
 selectedFiles = getSelectedFilesFromExplorer() if WINDOWS else getSelectedFilesFromStdIn()
 
 # Main upload process
-ssh = getSSH(username, hostname, password, timeout, port)
+ssh = getSSH(
+	username = username,
+	hostname = hostname,
+	password = password,
+	timeout  = timeout ,
+	port     = port
+)
 sftp = ssh.open_sftp()
 
 remoteFolder = remoteFolder.replace("\\", "/")

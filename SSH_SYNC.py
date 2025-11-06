@@ -283,7 +283,15 @@ def isFolderCaseSensitiveBase(
 	return (errorOccured, caseSense)
 
 if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
-	ssh = getSSH(username, hostname, password, keyFilename, timeout, port, silent)
+	ssh = getSSH(
+		username    = username    ,
+		hostname    = hostname    ,
+		password    = password    ,
+		keyFilename = keyFilename,
+		timeout     = timeout     ,
+		port        = port        ,
+		silent      = silent
+	)
 	sftp = ssh.open_sftp()
 
 	# Verifying remote folder

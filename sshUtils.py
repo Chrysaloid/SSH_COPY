@@ -12,7 +12,15 @@ from SimpleError import SimpleError
 from fileUtils import isDir, iteratePathParts
 from LocalSFTPAttributes import LocalSFTPAttributes
 
-def getSSH(username: str, hostname: str, password: str, keyFilename: str = None, TIMEOUT: float = 5, port = 22, silent = False):
+def getSSH(
+	username: str,
+	hostname: str,
+	password: str,
+	keyFilename: str = None,
+	timeout: float = 5,
+	port = 22,
+	silent = False
+):
 	ssh = paramiko.SSHClient()
 	ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -20,7 +28,14 @@ def getSSH(username: str, hostname: str, password: str, keyFilename: str = None,
 	try:
 		if not silent:
 			print(f"Attempting to connect to {clr(username, 'green')}@{clr(hostname, 'green')} ...")
-		ssh.connect(hostname, username=username, password=password, key_filename=keyFilename, timeout=TIMEOUT, port=port)
+		ssh.connect(
+			hostname     = hostname   ,
+			username     = username   ,
+			password     = password   ,
+			key_filename = keyFilename,
+			timeout      = timeout    ,
+			port         = port
+		)
 	except BadHostKeyException:
 		errorMessage = f"ERROR: The server's host key could not be verified for {hostname}"
 	except AuthenticationException:
@@ -32,7 +47,7 @@ def getSSH(username: str, hostname: str, password: str, keyFilename: str = None,
 	except NoValidConnectionsError:
 		errorMessage = f"ERROR: No valid connections could be made to {hostname} (connection refused or unreachable)"
 	except SSHException:
-		errorMessage = f"ERROR: General SSH error occurred while connecting to {hostname} (probably timeout after {TIMEOUT} seconds)"
+		errorMessage = f"ERROR: General SSH error occurred while connecting to {hostname} (probably timeout after {timeout} seconds)"
 
 	if errorMessage:
 		raise SimpleError(errorMessage)
