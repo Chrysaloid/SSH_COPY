@@ -1,5 +1,5 @@
-import os
 from datetime import datetime
+import os
 from stat import S_ISDIR, S_ISREG
 
 from .SimpleError import SimpleError

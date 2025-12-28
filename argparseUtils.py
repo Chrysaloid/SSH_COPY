@@ -1,6 +1,6 @@
 import argparse
-import sys
 from fnmatch import fnmatchcase
+import sys
 from typing import Callable
 
 from termcolor import colored as clr

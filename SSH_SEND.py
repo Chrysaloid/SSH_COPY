@@ -6,7 +6,7 @@ import time
 import paramiko
 from termcolor import colored as clr
 
-from .argparseUtils import COMMON_FORMATTER_CLASS, ArgumentParser_ColoredError
+from .argparseUtils import ArgumentParser_ColoredError, COMMON_FORMATTER_CLASS
 from .commonConstants import COLOR_ERROR, COLOR_ERROR_BACK, COLOR_OK, COLOR_WARN
 from .fileUtils import isDir, isFile
 from .getPlatform import WINDOWS

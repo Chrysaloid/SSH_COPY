@@ -1,21 +1,21 @@
 # region #* IMPORTS
 import argparse
+from collections import defaultdict
+from datetime import datetime
+from enum import auto, IntEnum
+from fnmatch import fnmatch, fnmatchcase
+from itertools import chain
 import os
 import posixpath
 import shutil
 import sys
 import time
-from collections import defaultdict
-from datetime import datetime
-from enum import IntEnum, auto
-from fnmatch import fnmatch, fnmatchcase
-from itertools import chain
 from typing import Callable, List, Tuple
 
 import paramiko
 from termcolor import colored as clr, cprint
 
-from .argparseUtils import COMMON_FORMATTER_CLASS, ArgumentParser_ColoredError, IncludeExcludeAction, NameFilter, NoRepeatAction
+from .argparseUtils import ArgumentParser_ColoredError, COMMON_FORMATTER_CLASS, IncludeExcludeAction, NameFilter, NoRepeatAction
 from .commonConstants import COLOR_EMPHASIS, COLOR_ERROR, COLOR_OK, COLOR_WARN
 from .fileUtils import assertFolderExists, ensureFolderExists, isDir, isFile, mkdir as localMkdir, modifiedDate
 from .getPlatform import WINDOWS
@@ -24,13 +24,13 @@ from .LocalSFTPAttributes import local_listdir_attr
 from .printRelTime import printRelTime
 from .SimpleError import SimpleError
 from .sshUtils import (
-	RemoteListDir,
 	assertRemoteFolderExists,
 	ensureRemoteFolderExists,
 	getSSH,
 	isFolderCaseSensitive as isRemoteFolderCaseSensitive,
 	remoteHasPython,
 	remoteIsWindows,
+	RemoteListDir,
 	remoteMkdir as remoteMkdirBase
 )
 
