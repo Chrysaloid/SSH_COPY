@@ -1,16 +1,12 @@
-from termcolor import colored as clr
 import socket
+
 import paramiko
-from paramiko.ssh_exception import (
-	BadHostKeyException,
-	AuthenticationException,
-	SSHException,
-	NoValidConnectionsError,
-	PartialAuthentication,
-)
-from SimpleError import SimpleError
-from fileUtils import isDir, iteratePathParts
-from LocalSFTPAttributes import LocalSFTPAttributes
+from paramiko.ssh_exception import AuthenticationException, BadHostKeyException, NoValidConnectionsError, PartialAuthentication, SSHException
+from termcolor import colored as clr
+
+from .fileUtils import isDir, iteratePathParts
+from .LocalSFTPAttributes import LocalSFTPAttributes
+from .SimpleError import SimpleError
 
 def getSSH(
 	username: str,

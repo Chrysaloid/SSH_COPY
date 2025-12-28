@@ -1,13 +1,14 @@
-from termcolor import colored as clr
-import os
-import json
-import posixpath
 import argparse
+import json
+import os
+import posixpath
 
-from SimpleError import SimpleError
-from sshUtils import getSSH
-from getPlatform import WINDOWS
-from commonConstants import COLOR_OK
+from termcolor import colored as clr
+
+from .commonConstants import COLOR_OK
+from .getPlatform import WINDOWS
+from .SimpleError import SimpleError
+from .sshUtils import getSSH
 
 TITLE = "SSH GET"
 

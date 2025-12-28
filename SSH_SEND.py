@@ -1,23 +1,25 @@
-from termcolor import colored as clr
-import os
-import paramiko
 import argparse
-import time
+import os
 import posixpath
+import time
+
+import paramiko
+from termcolor import colored as clr
+
+from .argparseUtils import COMMON_FORMATTER_CLASS, ArgumentParser_ColoredError
+from .commonConstants import COLOR_ERROR, COLOR_ERROR_BACK, COLOR_OK, COLOR_WARN
+from .fileUtils import isDir, isFile
+from .getPlatform import WINDOWS
+from .SimpleError import SimpleError
+from .sshUtils import assertRemoteFolderExists, getSSH, remoteMkdir
 
 start = time.time()
-
-from SimpleError import SimpleError
-from sshUtils import getSSH, assertRemoteFolderExists, remoteMkdir
-from getPlatform import WINDOWS
-from fileUtils import isFile, isDir
-from commonConstants import COLOR_OK, COLOR_ERROR, COLOR_WARN, COLOR_ERROR_BACK
-from argparseUtils import ArgumentParser_ColoredError, COMMON_FORMATTER_CLASS
 
 TITLE = "SSH SEND"
 
 if WINDOWS:
 	import ctypes
+
 	from getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
 	ctypes.windll.kernel32.SetConsoleTitleW(TITLE) # Hide title from shortcut
 	os.system("color")

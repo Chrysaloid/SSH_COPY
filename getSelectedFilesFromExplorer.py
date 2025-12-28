@@ -1,10 +1,11 @@
-from termcolor import colored as clr, cprint
-import win32com.client
-import win32gui
 import ctypes
 
-from SimpleError import SimpleError
-from commonConstants import COLOR_OK
+import win32com.client
+import win32gui
+from termcolor import colored as clr, cprint
+
+from .commonConstants import COLOR_OK
+from .SimpleError import SimpleError
 
 def getTopmostExplorerHwnd() -> int | None:
 	"""Get the HWND of the topmost (most recently active) Explorer window."""

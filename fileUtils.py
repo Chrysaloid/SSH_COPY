@@ -1,7 +1,8 @@
-from stat import S_ISREG, S_ISDIR
 import os
 from datetime import datetime
-from SimpleError import SimpleError
+from stat import S_ISDIR, S_ISREG
+
+from .SimpleError import SimpleError
 
 def isFile(stats: os.stat_result):
 	return S_ISREG(stats.st_mode)

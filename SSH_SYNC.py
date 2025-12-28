@@ -1,40 +1,42 @@
 # region #* IMPORTS
-from termcolor import colored as clr, cprint
-import os
-import paramiko
 import argparse
-import time
-from fnmatch import fnmatchcase, fnmatch
-import sys
-from datetime import datetime
+import os
 import posixpath
-from typing import Callable, Tuple, List
 import shutil
+import sys
+import time
 from collections import defaultdict
-from itertools import chain
+from datetime import datetime
 from enum import IntEnum, auto
+from fnmatch import fnmatch, fnmatchcase
+from itertools import chain
+from typing import Callable, List, Tuple
+
+import paramiko
+from termcolor import colored as clr, cprint
+
+from .argparseUtils import COMMON_FORMATTER_CLASS, ArgumentParser_ColoredError, IncludeExcludeAction, NameFilter, NoRepeatAction
+from .commonConstants import COLOR_EMPHASIS, COLOR_ERROR, COLOR_OK, COLOR_WARN
+from .fileUtils import assertFolderExists, ensureFolderExists, isDir, isFile, mkdir as localMkdir, modifiedDate
+from .getPlatform import WINDOWS
+from .isFolderCaseSensitive import isFolderCaseSensitive as isLocalFolderCaseSensitive
+from .LocalSFTPAttributes import local_listdir_attr
+from .printRelTime import printRelTime
+from .SimpleError import SimpleError
+from .sshUtils import (
+	RemoteListDir,
+	assertRemoteFolderExists,
+	ensureRemoteFolderExists,
+	getSSH,
+	isFolderCaseSensitive as isRemoteFolderCaseSensitive,
+	remoteHasPython,
+	remoteIsWindows,
+	remoteMkdir as remoteMkdirBase
+)
+
+# endregion
 
 start = time.perf_counter()
-
-from SimpleError import SimpleError
-from sshUtils import (
-	getSSH,
-	remoteIsWindows,
-	isFolderCaseSensitive as isRemoteFolderCaseSensitive,
-	assertRemoteFolderExists,
-	remoteMkdir as remoteMkdirBase,
-	RemoteListDir,
-	remoteHasPython,
-	ensureRemoteFolderExists
-)
-from getPlatform import WINDOWS
-from fileUtils import isFile, isDir, modifiedDate, assertFolderExists, ensureFolderExists, mkdir as localMkdir
-from LocalSFTPAttributes import local_listdir_attr
-from isFolderCaseSensitive import isFolderCaseSensitive as isLocalFolderCaseSensitive
-from commonConstants import COLOR_OK, COLOR_ERROR, COLOR_WARN, COLOR_EMPHASIS
-from argparseUtils import ArgumentParser_ColoredError, NoRepeatAction, NameFilter, IncludeExcludeAction, COMMON_FORMATTER_CLASS
-from printRelTime import printRelTime
-# endregion
 
 TITLE = "SSH SYNC"
 SOURCE_STR = "source"

@@ -1,6 +1,7 @@
-from getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
-import os
 import json
+import os
+
+from .getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
 
 selectedFiles = getSelectedFilesFromExplorer(infoAndError=False)
 
