@@ -1,13 +1,16 @@
-from termcolor import colored as clr
-import os
-import json
-import posixpath
-import argparse
+from pathlib import Path; __package__ = Path(__file__).resolve().parent.name # To be able to use relative imports
 
-from SimpleError import SimpleError
-from sshUtils import getSSH
-from getPlatform import WINDOWS
-from commonConstants import COLOR_OK
+import argparse
+import json
+import os
+import posixpath
+
+from termcolor import colored as clr
+
+from .commonConstants import COLOR_OK
+from .getPlatform import WINDOWS
+from .SimpleError import SimpleError
+from .sshUtils import getSSH
 
 TITLE = "SSH GET"
 

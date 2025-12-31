@@ -1,16 +1,14 @@
-from termcolor import colored as clr
+from pathlib import Path; __package__ = Path(__file__).resolve().parent.name # To be able to use relative imports
+
 import socket
+
 import paramiko
-from paramiko.ssh_exception import (
-	BadHostKeyException,
-	AuthenticationException,
-	SSHException,
-	NoValidConnectionsError,
-	PartialAuthentication,
-)
-from SimpleError import SimpleError
-from fileUtils import isDir, iteratePathParts
-from LocalSFTPAttributes import LocalSFTPAttributes
+from paramiko.ssh_exception import AuthenticationException, BadHostKeyException, NoValidConnectionsError, PartialAuthentication, SSHException
+from termcolor import colored as clr
+
+from .fileUtils import isDir, iteratePathParts
+from .LocalSFTPAttributes import LocalSFTPAttributes
+from .SimpleError import SimpleError
 
 def getSSH(
 	username: str,

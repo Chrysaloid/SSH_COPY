@@ -1,6 +1,9 @@
-from getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
-import os
+from pathlib import Path; __package__ = Path(__file__).resolve().parent.name # To be able to use relative imports
+
 import json
+import os
+
+from .getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
 
 selectedFiles = getSelectedFilesFromExplorer(infoAndError=False)
 

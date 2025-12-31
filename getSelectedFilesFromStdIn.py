@@ -1,7 +1,11 @@
-from termcolor import colored as clr
+from pathlib import Path; __package__ = Path(__file__).resolve().parent.name # To be able to use relative imports
+
 import sys
-from SimpleError import SimpleError
-from commonConstants import COLOR_OK
+
+from termcolor import colored as clr
+
+from .commonConstants import COLOR_OK
+from .SimpleError import SimpleError
 
 def getSelectedFilesFromStdIn(fileIO = sys.stdin):
 	selectedFiles = [line.strip() for line in fileIO if line.strip()]

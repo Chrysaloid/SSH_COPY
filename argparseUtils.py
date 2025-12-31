@@ -1,10 +1,13 @@
+from pathlib import Path; __package__ = Path(__file__).resolve().parent.name # To be able to use relative imports
+
 import argparse
-import sys
-from termcolor import colored as clr
 from fnmatch import fnmatchcase
+import sys
 from typing import Callable
 
-from commonConstants import COLOR_ERROR
+from termcolor import colored as clr
+
+from .commonConstants import COLOR_ERROR
 
 COMMON_FORMATTER_CLASS = lambda prog: argparse.HelpFormatter(prog, max_help_position=30, width=100)
 

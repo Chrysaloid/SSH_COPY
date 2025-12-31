@@ -1,6 +1,10 @@
+from pathlib import Path; __package__ = Path(__file__).resolve().parent.name # To be able to use relative imports
+
 import sys
+
 from termcolor import colored as clr
-from commonConstants import COLOR_ERROR
+
+from .commonConstants import COLOR_ERROR
 
 class SimpleError(Exception):
 	def __init__(self, message: str, color = COLOR_ERROR):

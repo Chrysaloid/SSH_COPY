@@ -1,10 +1,13 @@
+from pathlib import Path; __package__ = Path(__file__).resolve().parent.name # To be able to use relative imports
+
+import ctypes
+
 from termcolor import colored as clr, cprint
 import win32com.client
 import win32gui
-import ctypes
 
-from SimpleError import SimpleError
-from commonConstants import COLOR_OK
+from .commonConstants import COLOR_OK
+from .SimpleError import SimpleError
 
 def getTopmostExplorerHwnd() -> int | None:
 	"""Get the HWND of the topmost (most recently active) Explorer window."""

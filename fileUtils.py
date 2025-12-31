@@ -1,7 +1,10 @@
-from stat import S_ISREG, S_ISDIR
-import os
+from pathlib import Path; __package__ = Path(__file__).resolve().parent.name # To be able to use relative imports
+
 from datetime import datetime
-from SimpleError import SimpleError
+import os
+from stat import S_ISDIR, S_ISREG
+
+from .SimpleError import SimpleError
 
 def isFile(stats: os.stat_result):
 	return S_ISREG(stats.st_mode)
