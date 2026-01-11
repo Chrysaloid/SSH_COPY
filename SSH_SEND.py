@@ -19,16 +19,6 @@ from .sshUtils import assertRemoteFolderExists, getSSH, remoteMkdir
 
 TITLE = "SSH SEND"
 
-if WINDOWS:
-	import ctypes
-
-	from getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
-	ctypes.windll.kernel32.SetConsoleTitleW(TITLE) # Hide title from shortcut
-	os.system("color")
-else:
-	from getSelectedFilesFromStdIn import getSelectedFilesFromStdIn
-	print(f"\33]0;{TITLE}\a", end="", flush=True) # Hide title
-
 parser = ArgumentParser_ColoredError(
 	description="Copies selected files (and folders recursively) in Windows Explorer or Nautilus to a folder on a remote machine.",
 	formatter_class=COMMON_FORMATTER_CLASS,
@@ -50,6 +40,7 @@ parser.add_argument("-t", "--preserve-times", action="store_true" , help="If set
 parser.add_argument("-0", "--zero-file"     , action="store_true" , help="Create a file named 0 at the end of transfer. Useful for file-watching scripts on the remote machine", dest="zeroFile")
 parser.add_argument("-c", "--end-command"   , help="Command to run on the remote machine after file transfer", dest="endCommand")
 parser.add_argument("-d", "--dont-close"    , action="store_true" , help="Don't auto-close console window at the end if no error occurred. You will have to close it manually or by pressing ENTER", dest="dontClose")
+parser.add_argument("-i", "--hide-title"    , action="store_true" , help=f"Hide window title and replace it with {TITLE}", dest="hideTitle")
 
 args = parser.parse_args()
 
@@ -63,6 +54,19 @@ preserveTimes : bool  = args.preserveTimes
 zeroFile      : bool  = args.zeroFile
 endCommand    : str   = args.endCommand
 dontClose     : bool  = args.dontClose
+hideTitle     : bool  = args.hideTitle
+
+if WINDOWS:
+	import ctypes
+
+	from getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
+	if hideTitle:
+		ctypes.windll.kernel32.SetConsoleTitleW(TITLE) # Hide title from shortcut
+	os.system("color")
+else:
+	from getSelectedFilesFromStdIn import getSelectedFilesFromStdIn
+	if hideTitle:
+		print(f"\33]0;{TITLE}\a", end="", flush=True) # Hide title
 
 selectedFiles = getSelectedFilesFromExplorer() if WINDOWS else getSelectedFilesFromStdIn()
 
