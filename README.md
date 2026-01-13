@@ -1,4 +1,4 @@
-# SSH_COPY - 1.4.3
+# SSH_COPY - 1.4.4
 Small collection of Python scripts to easily copy files between devices in the same local network. You must set up DHCP (static IP addresses) in your router settings otherwise the scripts won't work as their setup relies on hardcoded (by You) addresses in the shortcuts or wrapper scripts.
 
 ## Initial setup
@@ -55,8 +55,8 @@ Then in Nautilus you can select file(s) and/or folder(s) and right click and the
 **Full help output:**
 
 ```
-usage: SSH_SEND.py [-h] -u USERNAME -H HOSTNAME -p PASSWORD -r REMOTEFOLDER [-P PORT] [-T TIMEOUT]
-                   [-t] [-0] [-c ENDCOMMAND] [-d]
+usage: SSH_SEND.py [-h] -u USERNAME -H HOSTNAME -p PASSWORD -r REMOTEFOLDER [-P PORT] [-T SECONDS]
+                   [-t] [-0] [-c ENDCOMMAND] [-d] [-i]
 
 Copies selected files (and folders recursively) in Windows Explorer or Nautilus to a folder on a
 remote machine.
@@ -71,7 +71,7 @@ Required arguments:
 Optional arguments:
   -h, --help                  show this help message and exit
   -P, --port PORT             Remote port (default: 22)
-  -T, --timeout TIMEOUT       TCP 3-way handshake timeout in seconds (default: 1)
+  -T, --timeout SECONDS       TCP 3-way handshake timeout in seconds (default: 5)
   -t, --preserve-times        If set, modification times will be preserved
   -0, --zero-file             Create a file named 0 at the end of transfer. Useful for file-watching
                               scripts on the remote machine
@@ -79,6 +79,7 @@ Optional arguments:
                               Command to run on the remote machine after file transfer
   -d, --dont-close            Don't auto-close console window at the end if no error occurred. You
                               will have to close it manually or by pressing ENTER
+  -i, --hide-title            Hide window title and replace it with SSH SEND
 ```
 
 **Example of successful output:**

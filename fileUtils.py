@@ -44,3 +44,11 @@ def assertFolderExists(path: str, additionalComment = ""):
 
 def ensureFolderExists(path: str):
 	os.makedirs(path, exist_ok=True)
+
+class LocalDirEntry:
+	def __init__(self, absPath: str):
+		self.path = absPath # os.path.abspath(absPath)
+		self.name = os.path.basename(absPath)
+
+	def stat(self, follow_symlinks=True):
+		return os.stat(self.path, follow_symlinks=follow_symlinks)

@@ -12,7 +12,7 @@ start = time.time()
 
 from .argparseUtils import ArgumentParser_ColoredError, COMMON_FORMATTER_CLASS
 from .commonConstants import COLOR_ERROR, COLOR_ERROR_BACK, COLOR_OK, COLOR_WARN
-from .fileUtils import isDir, isFile
+from .fileUtils import isDir, isFile, LocalDirEntry
 from .getPlatform import WINDOWS
 from .SimpleError import SimpleError
 from .sshUtils import assertRemoteFolderExists, getSSH, remoteMkdir
@@ -41,6 +41,7 @@ parser.add_argument("-0", "--zero-file"     , action="store_true" , help="Create
 parser.add_argument("-c", "--end-command"   , help="Command to run on the remote machine after file transfer", dest="endCommand")
 parser.add_argument("-d", "--dont-close"    , action="store_true" , help="Don't auto-close console window at the end if no error occurred. You will have to close it manually or by pressing ENTER", dest="dontClose")
 parser.add_argument("-i", "--hide-title"    , action="store_true" , help=f"Hide window title and replace it with {TITLE}", dest="hideTitle")
+# parser.add_argument("-n", "--handle-non-abs-paths", action="store_true" , help=f"If a file path does not start with --prefix try to recursively search for it in --search-root folder", dest="handleNonAbsPaths")
 
 args = parser.parse_args()
 
@@ -55,6 +56,7 @@ zeroFile      : bool  = args.zeroFile
 endCommand    : str   = args.endCommand
 dontClose     : bool  = args.dontClose
 hideTitle     : bool  = args.hideTitle
+# handleNonAbsPaths : bool  = args.handleNonAbsPaths
 
 if WINDOWS:
 	import ctypes
@@ -101,16 +103,11 @@ def sftpUpload(sftp: paramiko.SFTPClient, localEntry: os.DirEntry, remotePath: s
 			for entry in dir:
 				sftpUpload(sftp, entry, posixpath.join(remotePath, entry.name))
 
-class LocalDirEntry:
-	def __init__(self, absPath: str):
-		self.path = absPath # os.path.abspath(absPath)
-		self.name = os.path.basename(absPath)
-
-	def stat(self, follow_symlinks=True):
-		return os.stat(self.path, follow_symlinks=follow_symlinks)
-
 print("Sending files:\n")
 for path in selectedFiles:
+	if not os.path.exists(path):
+		print(f"{clr("Warning!", COLOR_WARN)} Non existent path: {path}")
+		continue
 	entry = LocalDirEntry(path)
 	remoteTarget = posixpath.join(remoteFolder, entry.name)
 	sftpUpload(sftp, entry, remoteTarget)
