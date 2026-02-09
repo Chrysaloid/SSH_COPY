@@ -27,7 +27,7 @@ class NoRepeatAction(argparse.Action):
 		setattr(namespace, self.dest, values)
 
 class NameFilter:
-	def __init__(self, pattern: str, matchVal: bool, matchingFunc: Callable):
+	def __init__(self, pattern: str, matchVal: bool, matchingFunc: Callable[[str, str], bool]):
 		self.pattern = pattern
 		self.matchVal = matchVal
 		self.matchingFunc = matchingFunc
@@ -38,6 +38,12 @@ def fnmatchNotCase(name: str, pat: str) -> bool:
 
 	# In our case we skip the .lower() for pat as we will do that only once in the __call__ method
 	return fnmatchcase(name.lower(), pat)
+
+def matchPathCase(path: str, pathPat: str) -> bool:
+	return pathPat.startswith(path)
+
+def matchPathNotCase(path: str, pathPat: str) -> bool:
+	return pathPat.startswith(path.lower())
 
 class IncludeExcludeAction(argparse.Action):
 	destDefaults = {}
@@ -51,7 +57,19 @@ class IncludeExcludeAction(argparse.Action):
 		longName = max(option_strings, key=len)
 
 		self.matchVal = longName.startswith("--include")
-		self.matchingFunc = fnmatchcase if longName.endswith("case") else fnmatchNotCase
+		isPath = longName.endswith("path")
+		isCase = "case" in longName
+
+		if isPath:
+			if isCase:
+				self.matchingFunc = matchPathCase
+			else:
+				self.matchingFunc = matchPathNotCase
+		else:
+			if isCase:
+				self.matchingFunc = fnmatchcase
+			else:
+				self.matchingFunc = fnmatchNotCase
 
 	def __call__(self, parser, namespace, values, option_string=None):
 		# Ensure the target list exists
@@ -67,7 +85,7 @@ class IncludeExcludeAction(argparse.Action):
 
 		for pattern in values:
 			items.append(NameFilter(
-				pattern if self.matchingFunc is fnmatchcase else pattern.lower(),
+				pattern if (self.matchingFunc is fnmatchcase or self.matchingFunc is matchPathCase) else pattern.lower(),
 				self.matchVal,
 				self.matchingFunc
 			))

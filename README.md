@@ -1,4 +1,4 @@
-# SSH_COPY - 1.4.4
+# SSH_COPY - 1.5.0
 Small collection of Python scripts to easily copy files between devices in the same local network. You must set up DHCP (static IP addresses) in your router settings otherwise the scripts won't work as their setup relies on hardcoded (by You) addresses in the shortcuts or wrapper scripts.
 
 ## Initial setup
@@ -127,7 +127,11 @@ usage: SSH_SYNC.py [-h] -l ABSOLUTE_PATH -r ABSOLUTE_PATH [-i [PATTERN_1 [PATTER
                    [-e [PATTERN_1 [PATTERN_2 ...]]] [-c [PATTERN_1 [PATTERN_2 ...]]]
                    [-a [PATTERN_1 [PATTERN_2 ...]]] [-I [PATTERN_1 [PATTERN_2 ...]]]
                    [-E [PATTERN_1 [PATTERN_2 ...]]] [-C [PATTERN_1 [PATTERN_2 ...]]]
-                   [-A [PATTERN_1 [PATTERN_2 ...]]] [-u USERNAME] [-H HOSTNAME] [-p PASSWORD]
+                   [-A [PATTERN_1 [PATTERN_2 ...]]] [-V [PATTERN_1 [PATTERN_2 ...]]]
+                   [-Z [PATTERN_1 [PATTERN_2 ...]]] [-Q [PATTERN_1 [PATTERN_2 ...]]]
+                   [-w [PATTERN_1 [PATTERN_2 ...]]] [-U [PATTERN_1 [PATTERN_2 ...]]]
+                   [-o [PATTERN_1 [PATTERN_2 ...]]] [-Y [PATTERN_1 [PATTERN_2 ...]]]
+                   [-X [PATTERN_1 [PATTERN_2 ...]]] [-u USERNAME] [-H HOSTNAME] [-p PASSWORD]
                    [-y KEY_FILENAME [KEY_FILENAME ...]] [-P PORT] [-T SECONDS] [-n DATE] [-f DATE]
                    [-R [MAX_RECURSION_DEPTH]] [-S] [-x] [-v] [-s] [-t] [-B] [-d] [-b] [-k] [-K] [-L]
                    [-G] [-m {sync,copy}] [-F] [-N] [-M] [-D] [-g [FORMAT]] [-j]
@@ -158,6 +162,22 @@ Optional common arguments:
                               Glob patterns for folders to include in copy/sync (case-sensitive)
   -A, --exclude-folders-case [PATTERN_1 [PATTERN_2 ...]]
                               Glob patterns for folders to exclude in copy/sync (case-sensitive)
+  -V, --include-files-path [PATTERN_1 [PATTERN_2 ...]]
+                              Paths of files to include in copy/sync
+  -Z, --exclude-files-path [PATTERN_1 [PATTERN_2 ...]]
+                              Paths of files to exclude in copy/sync
+  -Q, --include-files-case-path [PATTERN_1 [PATTERN_2 ...]]
+                              Paths of files to include in copy/sync (case-sensitive)
+  -w, --exclude-files-case-path [PATTERN_1 [PATTERN_2 ...]]
+                              Paths of files to exclude in copy/sync (case-sensitive)
+  -U, --include-folders-path [PATTERN_1 [PATTERN_2 ...]]
+                              Paths of folders to include in copy/sync
+  -o, --exclude-folders-path [PATTERN_1 [PATTERN_2 ...]]
+                              Paths of folders to exclude in copy/sync
+  -Y, --include-folders-case-path [PATTERN_1 [PATTERN_2 ...]]
+                              Paths of folders to include in copy/sync (case-sensitive)
+  -X, --exclude-folders-case-path [PATTERN_1 [PATTERN_2 ...]]
+                              Paths of folders to exclude in copy/sync (case-sensitive)
   -u, --username USERNAME     Remote username
   -H, --hostname HOSTNAME     Remote host's address
   -p, --password PASSWORD     Remote password
