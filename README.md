@@ -1,4 +1,4 @@
-# SSH_COPY - 1.5.0
+# SSH_COPY - 1.5.1
 Small collection of Python scripts to easily copy files between devices in the same local network. You must set up DHCP (static IP addresses) in your router settings otherwise the scripts won't work as their setup relies on hardcoded (by You) addresses in the shortcuts or wrapper scripts.
 
 ## Initial setup
@@ -249,9 +249,9 @@ SYNC mode arguments:
 
 **Arguments that need more explanation:**
 
-- `--include-*` and `--exclude-*` arguments - They allow for fine-grained file/folder selection. They use only the file/folder name for matching. They use Unix filename pattern matching provided by the [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) module. You can pass multiple parameters at a time and you can specify those arguments multiple times. Each of these will be checked in order they were passed and first one that matches the given filename will take effect. If the first argument of this kind is a `--include-*` argument by default all files will be excluded. Analogically if the first argument of this kind is a `--exclude-*` argument by default all files will be included. When none of those arguments is specified all files are included by default. I made it work that way as I think it's quite intuitive - if you just `--include-*` something you probably want to just copy that and nothing else and if you just `--exclude-*` something you probably want to copy everything except that. Some examples:
+- `--include-*` and `--exclude-*` arguments - They allow for fine-grained file/folder selection. They use only the file/folder name for matching. They use Unix filename pattern matching provided by the [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) module. You can pass multiple parameters at a time and you can specify those arguments multiple times. Each of these will be checked in order they were passed and first one that matches the given filename will take effect. If the first argument of this kind is a `--include-*` argument by default all files will be excluded. Analogically if the first argument of this kind is a `--exclude-*` argument by default all files will be included. When none of those arguments is specified all files are included by default. I made it work that way as I think it's quite intuitive - if you just `--include-*` something you probably want to just copy that and nothing else and if you just `--exclude-*` something you probably want to copy everything except that. **Files and folders have separate include/exlude defaulting** - the first argument of each kind defines the default rule for that kind. Some examples:
 
-	- `--include-files *.mp3` - Only copy MP3 files and nothing else.
+	- `--include-files *.mp3` - Only copy MP3 files and nothing else. If you also specify `--recursive` there is no need to specify `--include-folders *` as **files and folders have separate include/exlude defaulting**.
 
 	- `--exclude-files  bad-song-1.mp3  bad-song-2.mp3  --include-files  *.mp3  *.flac  *.m4a  --exclude-files *` or `--include-files  --exclude-files  bad-song-1.mp3  bad-song-2.mp3  --include-files  *.mp3  *.flac  *.m4a` - only copy audio files and nothing else but exclude some specific files.
 

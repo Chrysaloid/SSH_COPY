@@ -32,18 +32,21 @@ class NameFilter:
 		self.matchVal = matchVal
 		self.matchingFunc = matchingFunc
 
-def fnmatchNotCase(name: str, pat: str) -> bool:
+def filenameMatchCase(name: str, path: str, pat: str) -> bool:
+	return fnmatchcase(name, pat)
+
+def filenameMatchNotCase(name: str, path: str, pat: str) -> bool:
 	# In general case one would use the following:
 	# return fnmatchcase(name.lower(), pat.lower())
 
 	# In our case we skip the .lower() for pat as we will do that only once in the __call__ method
 	return fnmatchcase(name.lower(), pat)
 
-def matchPathCase(path: str, pathPat: str) -> bool:
-	return pathPat.startswith(path)
+def pathMatchCase(name: str, path: str, pat: str) -> bool:
+	return path.startswith(pat)
 
-def matchPathNotCase(path: str, pathPat: str) -> bool:
-	return pathPat.startswith(path.lower())
+def pathMatchNotCase(name: str, path: str, pat: str) -> bool:
+	return path.lower().startswith(pat)
 
 class IncludeExcludeAction(argparse.Action):
 	destDefaults = {}
@@ -57,19 +60,20 @@ class IncludeExcludeAction(argparse.Action):
 		longName = max(option_strings, key=len)
 
 		self.matchVal = longName.startswith("--include")
-		isPath = longName.endswith("path")
-		isCase = "case" in longName
+		self.isPath = longName.endswith("path")
+		self.isCase = "case" in longName
+		self.entryType = "file" if "file" in longName else "folder"
 
-		if isPath:
-			if isCase:
-				self.matchingFunc = matchPathCase
+		if self.isPath:
+			if self.isCase:
+				self.matchingFunc = pathMatchCase
 			else:
-				self.matchingFunc = matchPathNotCase
+				self.matchingFunc = pathMatchNotCase
 		else:
-			if isCase:
-				self.matchingFunc = fnmatchcase
+			if self.isCase:
+				self.matchingFunc = filenameMatchCase
 			else:
-				self.matchingFunc = fnmatchNotCase
+				self.matchingFunc = filenameMatchNotCase
 
 	def __call__(self, parser, namespace, values, option_string=None):
 		# Ensure the target list exists
@@ -80,12 +84,16 @@ class IncludeExcludeAction(argparse.Action):
 
 		# If --include-* argument was first - by default exclude
 		# If --exclude-* argument was first - by default include
-		if self.dest not in IncludeExcludeAction.destDefaults:
-			IncludeExcludeAction.destDefaults[self.dest] = not self.matchVal
+		if self.entryType not in IncludeExcludeAction.destDefaults:
+			IncludeExcludeAction.destDefaults[self.entryType] = not self.matchVal
 
 		for pattern in values:
-			items.append(NameFilter(
-				pattern if (self.matchingFunc is fnmatchcase or self.matchingFunc is matchPathCase) else pattern.lower(),
-				self.matchVal,
-				self.matchingFunc
-			))
+			pattern = pattern.strip()
+			if pattern:
+				pattern = pattern if self.isCase else pattern.lower()
+				pattern = pattern.replace("\\", "/").rstrip("/") if self.isPath else pattern
+				items.append(NameFilter(
+					pattern,
+					self.matchVal,
+					self.matchingFunc
+				))

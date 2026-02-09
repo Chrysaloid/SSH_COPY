@@ -83,22 +83,22 @@ class ACTION(IntEnum):
 
 parser._optionals.title = "Optional common arguments"
 
-parser.add_argument("-i", "--include-files"            , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for files to include in copy/sync"                   , dest="inExcludeFiles"      , metavar=("PATTERN_1", "PATTERN_2"))
-parser.add_argument("-e", "--exclude-files"            , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for files to exclude in copy/sync"                   , dest="inExcludeFiles"      , metavar=("PATTERN_1", "PATTERN_2"))
-parser.add_argument("-c", "--include-files-case"       , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for files to include in copy/sync (case-sensitive)"  , dest="inExcludeFiles"      , metavar=("PATTERN_1", "PATTERN_2"))
-parser.add_argument("-a", "--exclude-files-case"       , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for files to exclude in copy/sync (case-sensitive)"  , dest="inExcludeFiles"      , metavar=("PATTERN_1", "PATTERN_2"))
-parser.add_argument("-I", "--include-folders"          , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for folders to include in copy/sync"                 , dest="inExcludeFolders"    , metavar=("PATTERN_1", "PATTERN_2"))
-parser.add_argument("-E", "--exclude-folders"          , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for folders to exclude in copy/sync"                 , dest="inExcludeFolders"    , metavar=("PATTERN_1", "PATTERN_2"))
-parser.add_argument("-C", "--include-folders-case"     , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for folders to include in copy/sync (case-sensitive)", dest="inExcludeFolders"    , metavar=("PATTERN_1", "PATTERN_2"))
-parser.add_argument("-A", "--exclude-folders-case"     , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for folders to exclude in copy/sync (case-sensitive)", dest="inExcludeFolders"    , metavar=("PATTERN_1", "PATTERN_2"))
-parser.add_argument("-V", "--include-files-path"       , default=[], action=IncludeExcludeAction, nargs="*", help="Paths of files to include in copy/sync"                            , dest="inExcludeFilesPath"  , metavar=("PATTERN_1", "PATTERN_2"))
-parser.add_argument("-Z", "--exclude-files-path"       , default=[], action=IncludeExcludeAction, nargs="*", help="Paths of files to exclude in copy/sync"                            , dest="inExcludeFilesPath"  , metavar=("PATTERN_1", "PATTERN_2"))
-parser.add_argument("-Q", "--include-files-case-path"  , default=[], action=IncludeExcludeAction, nargs="*", help="Paths of files to include in copy/sync (case-sensitive)"           , dest="inExcludeFilesPath"  , metavar=("PATTERN_1", "PATTERN_2"))
-parser.add_argument("-w", "--exclude-files-case-path"  , default=[], action=IncludeExcludeAction, nargs="*", help="Paths of files to exclude in copy/sync (case-sensitive)"           , dest="inExcludeFilesPath"  , metavar=("PATTERN_1", "PATTERN_2"))
-parser.add_argument("-U", "--include-folders-path"     , default=[], action=IncludeExcludeAction, nargs="*", help="Paths of folders to include in copy/sync"                          , dest="inExcludeFoldersPath", metavar=("PATTERN_1", "PATTERN_2"))
-parser.add_argument("-o", "--exclude-folders-path"     , default=[], action=IncludeExcludeAction, nargs="*", help="Paths of folders to exclude in copy/sync"                          , dest="inExcludeFoldersPath", metavar=("PATTERN_1", "PATTERN_2"))
-parser.add_argument("-Y", "--include-folders-case-path", default=[], action=IncludeExcludeAction, nargs="*", help="Paths of folders to include in copy/sync (case-sensitive)"         , dest="inExcludeFoldersPath", metavar=("PATTERN_1", "PATTERN_2"))
-parser.add_argument("-X", "--exclude-folders-case-path", default=[], action=IncludeExcludeAction, nargs="*", help="Paths of folders to exclude in copy/sync (case-sensitive)"         , dest="inExcludeFoldersPath", metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-i", "--include-files"            , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for files to include in copy/sync"                   , dest="inExcludeFiles"  , metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-e", "--exclude-files"            , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for files to exclude in copy/sync"                   , dest="inExcludeFiles"  , metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-c", "--include-files-case"       , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for files to include in copy/sync (case-sensitive)"  , dest="inExcludeFiles"  , metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-a", "--exclude-files-case"       , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for files to exclude in copy/sync (case-sensitive)"  , dest="inExcludeFiles"  , metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-I", "--include-folders"          , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for folders to include in copy/sync"                 , dest="inExcludeFolders", metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-E", "--exclude-folders"          , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for folders to exclude in copy/sync"                 , dest="inExcludeFolders", metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-C", "--include-folders-case"     , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for folders to include in copy/sync (case-sensitive)", dest="inExcludeFolders", metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-A", "--exclude-folders-case"     , default=[], action=IncludeExcludeAction, nargs="*", help="Glob patterns for folders to exclude in copy/sync (case-sensitive)", dest="inExcludeFolders", metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-V", "--include-files-path"       , default=[], action=IncludeExcludeAction, nargs="*", help="Absolute paths of files to include in copy/sync"                   , dest="inExcludeFiles"  , metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-Z", "--exclude-files-path"       , default=[], action=IncludeExcludeAction, nargs="*", help="Absolute paths of files to exclude in copy/sync"                   , dest="inExcludeFiles"  , metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-Q", "--include-files-case-path"  , default=[], action=IncludeExcludeAction, nargs="*", help="Absolute paths of files to include in copy/sync (case-sensitive)"  , dest="inExcludeFiles"  , metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-w", "--exclude-files-case-path"  , default=[], action=IncludeExcludeAction, nargs="*", help="Absolute paths of files to exclude in copy/sync (case-sensitive)"  , dest="inExcludeFiles"  , metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-U", "--include-folders-path"     , default=[], action=IncludeExcludeAction, nargs="*", help="Absolute paths of folders to include in copy/sync"                 , dest="inExcludeFolders", metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-o", "--exclude-folders-path"     , default=[], action=IncludeExcludeAction, nargs="*", help="Absolute paths of folders to exclude in copy/sync"                 , dest="inExcludeFolders", metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-Y", "--include-folders-case-path", default=[], action=IncludeExcludeAction, nargs="*", help="Absolute paths of folders to include in copy/sync (case-sensitive)", dest="inExcludeFolders", metavar=("PATTERN_1", "PATTERN_2"))
+parser.add_argument("-X", "--exclude-folders-case-path", default=[], action=IncludeExcludeAction, nargs="*", help="Absolute paths of folders to exclude in copy/sync (case-sensitive)", dest="inExcludeFolders", metavar=("PATTERN_1", "PATTERN_2"))
 parser.add_argument("-u", "--username"                  , default=""                    , help="Remote username")
 parser.add_argument("-H", "--hostname"                  , default=""                    , help="Remote host's address")
 parser.add_argument("-p", "--password"                  , default=None                  , help="Remote password")
@@ -144,8 +144,6 @@ localFolder            : str                = args.localFolder
 remoteFolder           : str                = args.remoteFolder
 inExcludeFiles         : list  [NameFilter] = args.inExcludeFiles
 inExcludeFolders       : list  [NameFilter] = args.inExcludeFolders
-inExcludeFilesPath     : list  [NameFilter] = args.inExcludeFilesPath
-inExcludeFoldersPath   : list  [NameFilter] = args.inExcludeFoldersPath
 force                  : bool               = args.force
 newerThanNewestFile    : bool               = args.newerThanNewestFile
 newerThanNewestFolder  : bool               = args.newerThanNewestFolder
@@ -203,11 +201,9 @@ dateFormats = (
 )
 def preProcessFilesOrFolders(
 		strName: str,
-		strParam: str,
 		newerThanParamName: str,
 		newerThan: str,
 		inExclude: list[NameFilter],
-		inExcludePath: list[NameFilter],
 	) -> Tuple[int, Callable[[str], bool]]:
 	newerThanDate = 0
 	if newerThan:
@@ -224,37 +220,26 @@ def preProcessFilesOrFolders(
 	if verbose:
 		print(f'Correctly parsed {newerThanParamName} parameter "{newerThan}" as {datetime.fromtimestamp(newerThanDate)}')
 
-	defaultMatch = IncludeExcludeAction.destDefaults.get(strParam, True)
+	defaultMatch = IncludeExcludeAction.destDefaults.get(strName, True)
 
 	if verbose:
 		print(f'By default all {strName}s will be {"included" if defaultMatch else "exluded"}')
 
 	if inExclude:
-		def match(name: str) -> bool:
+		def match(name: str, filePath: str) -> bool:
 			for filterObj in inExclude:
-				if filterObj.matchingFunc(name, filterObj.pattern):
+				if filterObj.matchingFunc(name, filePath, filterObj.pattern):
 					return filterObj.matchVal
 
 			return defaultMatch
 	else:
-		def match(name: str) -> bool:
+		def match(name: str, filePath: str) -> bool:
 			return defaultMatch
 
-	if inExcludePath:
-		def matchPath(filePath: str) -> bool:
-			for filterObj in inExcludePath:
-				if filterObj.matchingFunc(filePath, filterObj.pattern):
-					return filterObj.matchVal
+	return int(newerThanDate), match
 
-			return defaultMatch
-	else:
-		def matchPath(filePath: str) -> bool:
-			return defaultMatch
-
-	return int(newerThanDate), match, matchPath
-
-filesNewerThanDate  , fileMatch  , fileMatchPath   = preProcessFilesOrFolders("file"  , "inExcludeFiles"  , "-n/--files-newer-than"  , filesNewerThan  , inExcludeFiles  , inExcludeFilesPath  )
-foldersNewerThanDate, folderMatch, folderMatchPath = preProcessFilesOrFolders("folder", "inExcludeFolders", "-f/--folders-newer-than", foldersNewerThan, inExcludeFolders, inExcludeFoldersPath)
+filesNewerThanDate  , fileMatch   = preProcessFilesOrFolders("file"  , "-n/--files-newer-than"  , filesNewerThan  , inExcludeFiles  )
+foldersNewerThanDate, folderMatch = preProcessFilesOrFolders("folder", "-f/--folders-newer-than", foldersNewerThan, inExcludeFolders)
 
 #* LOCAL/REMOTE FOLDER PARAMETER VALIDATION
 try:
@@ -629,8 +614,8 @@ class FilterClass:
 		# ___NewerThanDate comparisons use the < operator so if the user inputs exact modification date
 		# of some file/folder that file/folder will not be included in the operations
 		filePath = posixpath.join(self.sourceFolderParam, entry.filename)
-		return isFile(entry)                      and filesNewerThanDate   < entry.st_mtime and fileMatch  (entry.filename) and fileMatchPath  (filePath) \
-		    or isDir (entry) and self.recursionOk and foldersNewerThanDate < entry.st_mtime and folderMatch(entry.filename) and folderMatchPath(filePath)
+		return isFile(entry)                      and filesNewerThanDate   < entry.st_mtime and fileMatch  (entry.filename, filePath) \
+		    or isDir (entry) and self.recursionOk and foldersNewerThanDate < entry.st_mtime and folderMatch(entry.filename, filePath)
 
 	def __call__(self, entry: paramiko.SFTPAttributes) -> bool:
 		val = self._innerFilterFun(entry)
