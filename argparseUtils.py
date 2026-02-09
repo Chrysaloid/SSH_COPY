@@ -43,10 +43,14 @@ def filenameMatchNotCase(name: str, path: str, pat: str) -> bool:
 	return fnmatchcase(name.lower(), pat)
 
 def pathMatchCase(name: str, path: str, pat: str) -> bool:
-	return path.startswith(pat)
+	""" I.e. pat = `/some/folder` should match paths `/some` and `/some/folder/file` so it allows
+	recursion to get to `/some/folder` from `/` and allows recursion to go to subfolders and files of
+	`/some/folder` """
+	return path.startswith(pat) or pat.startswith(path)
 
 def pathMatchNotCase(name: str, path: str, pat: str) -> bool:
-	return path.lower().startswith(pat)
+	pathLower = path.lower()
+	return pathLower.startswith(pat) or pat.startswith(pathLower)
 
 class IncludeExcludeAction(argparse.Action):
 	destDefaults = {}
@@ -91,7 +95,7 @@ class IncludeExcludeAction(argparse.Action):
 			pattern = pattern.strip()
 			if pattern:
 				pattern = pattern if self.isCase else pattern.lower()
-				pattern = pattern.replace("\\", "/").rstrip("/") if self.isPath else pattern
+				pattern = pattern.replace("\\", "/").rstrip("/") # not conditional to support .gitignore style folder mathing
 				items.append(NameFilter(
 					pattern,
 					self.matchVal,

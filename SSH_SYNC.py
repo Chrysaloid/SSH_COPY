@@ -188,8 +188,9 @@ REMOTE_IS_REMOTE = bool(username)
 if silent and verbose:
 	raise SimpleError("-s/--silent and -v/--verbose options cannot both be specified at the same time")
 
-localFolder = os.path.abspath(localFolder).replace("\\", "/").rstrip("/")
-remoteFolder = remoteFolder.replace("\\", "/").rstrip("/")
+# Ensure paths end with "/" so os.path.abspath won't return unexpected results
+localFolder = os.path.abspath(localFolder).replace("\\", "/").rstrip("/") + "/"
+remoteFolder = remoteFolder.replace("\\", "/").rstrip("/") + "/"
 
 dateFormats = (
 	"%Y",
@@ -295,13 +296,13 @@ def isFolderCaseSensitiveBase(
 
 if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 	ssh = getSSH(
-		username    = username    ,
-		hostname    = hostname    ,
-		password    = password    ,
+		username    = username   ,
+		hostname    = hostname   ,
+		password    = password   ,
 		keyFilename = keyFilename,
-		timeout     = timeout     ,
-		port        = port        ,
-		silent      = silent
+		timeout     = timeout    ,
+		port        = port       ,
+		silent      = silent     ,
 	)
 	sftp = ssh.open_sftp()
 
@@ -622,11 +623,12 @@ class FilterClass:
 
 		if not val:
 			name = entry.filename
-			relPath = posixpath.join(self.sourceFolderParam, name).replace(self.sourceFolderBase, "", 1)
+			filePath = posixpath.join(self.sourceFolderParam, entry.filename)
+			relPath = filePath.replace(self.sourceFolderBase, "", 1)
 			if isFile(entry):
 				if not (filesNewerThanDate <= entry.st_mtime):
 					print(f'{relPath} - skipping file because it ({modifiedDate(entry)}) is not newer than -n/--files-newer-than parameter')
-				elif not fileMatch(name):
+				elif not fileMatch(name, filePath):
 					print(f"{relPath} - skipping file because fileMatch returned False")
 				else:
 					cprint(f"{relPath} - skipping file because of unknown reason", COLOR_ERROR) # Shouldn't happen
@@ -635,7 +637,7 @@ class FilterClass:
 					print(f"{relPath} - skipping folder because we are at max recursion depth and createMaxRecFolders is False")
 				elif not (foldersNewerThanDate <= entry.st_mtime):
 					print(f'{relPath} - skipping folder because it ({modifiedDate(entry)}) is not newer than -f/--folders-newer-than parameter')
-				elif not folderMatch(name):
+				elif not folderMatch(name, filePath):
 					print(f"{relPath} - skipping folder because folderMatch returned False")
 				else:
 					cprint(f"{relPath} - skipping folder because of unknown reason", COLOR_ERROR) # Shouldn't happen
