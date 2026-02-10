@@ -832,9 +832,12 @@ def recursiveCopy(
 			else                 : destEntriesDict = {entry.filename.lower(): entry for entry in destEntries}
 
 			if removeNotInSrc and destEntries:
-				sourceNames = {entry.filename for entry in sourceEntries}
-				for destEntry in destEntries:
-					if destEntry.filename not in sourceNames:
+				if ALL_CASE_SENSITIVE:
+					sourceNames = {entry.filename for entry in sourceEntries}
+				else:
+					sourceNames = {entry.filename.lower() for entry in sourceEntries}
+				for filename, destEntry in destEntriesDict.items(): # We iterate over destEntriesDict because it has case normalized names if not ALL_CASE_SENSITIVE
+					if filename not in sourceNames:
 						recursiveRemove(destFolderParam, destEntry, NNS.destFolderIter, NNS.destRemove, NNS.destRmdir, NNS.dest_designation, NNS.dest_str)
 
 			for sourceEntry in sourceEntries:
