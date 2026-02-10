@@ -52,7 +52,7 @@ else:
 	print(f"\33]0;{TITLE}\a", end="", flush=True) # Hide title
 
 # region #* PARAMETER PARSING
-parser = ArgumentParser_ColoredError(
+parser = ArgumentParser_ColoredError( # Remaining letter pargument names: O W h m q
 	description="Copy or sync files between folders on remote or local machines",
 	formatter_class=COMMON_FORMATTER_CLASS,
 )
@@ -130,6 +130,7 @@ copyMode.add_argument("-F", "--force"                   , action="store_true" , 
 copyMode.add_argument("-N", "--newer-than-newest-file"  , action="store_true" , help="Copy only files newer then the newest file in the destination folder", dest="newerThanNewestFile")
 copyMode.add_argument("-M", "--newer-than-newest-folder", action="store_true" , help="Copy only files newer then the newest folder in the destination folder", dest="newerThanNewestFolder")
 copyMode.add_argument("-D", "--dont-filter-dest"        , action="store_false", help="Don't filter the destination files/folders WHEN SEARCHING FOR THE NEWEST FILE", dest="filterDest")
+copyMode.add_argument("-J", "--remove-not-in-src"       , action="store_true" , help="Remove destination files that are not present in filtered source file set", dest="removeNotInSrc")
 
 syncMode = parser.add_argument_group("SYNC mode arguments")
 syncMode.add_argument("-g", "--print-common-date"       , const="%Y-%m-%d %H:%M - {rel}", nargs="?", help='Before printing file transfers print the detected newest common date. Optionaly take date format string as parameter (default: "%(const)s")', dest="printCommonDate", metavar="FORMAT")
@@ -168,6 +169,7 @@ endOnInaccessibleEntry : bool               = args.endOnInaccessibleEntry
 endOnFileOntoFolder    : bool               = args.endOnFileOntoFolder
 sortEntries            : bool               = args.sortEntries
 shouldSend2trash       : bool               = args.send2trash
+removeNotInSrc         : bool               = args.removeNotInSrc
 printCommonDate        : str                = args.printCommonDate
 commonDateFromFolders  : bool               = args.commonDateFromFolders
 # dryRun                 : bool               = args.dryRun
@@ -569,16 +571,7 @@ def recursiveRemove(
 			return
 
 		for entry in entries:
-			newPath = posixpath.join(basePath, entry.filename)
-			if isFile(entry):
-				try:
-					removeFileFun(newPath)
-					if not silent:
-						cprint(f"Removed: {newPath}", REMOVE_COLOR)
-				except Exception as e:
-					permissionErrorHandler(e, designation, type, basePath, "file", "deleting")
-			elif isDir(entry):
-				recursiveRemove(newPath, entry, iterFun, removeFileFun, removeFolderFun)
+			recursiveRemove(basePath, entry, iterFun, removeFileFun, removeFolderFun, designation, type)
 
 		try:
 			removeFolderFun(basePath)
@@ -797,15 +790,15 @@ def recursiveCopy(
 				permissionErrorHandler(e, NNS.source_designation, NNS.source_str, sourceFolderParam)
 				return
 
-			if not sourceEntries: return
+			if not sourceEntries and not removeNotInSrc: return
 
 			sourceErrorOccured, sourceCaseSense = NNS.isSourceFolderCaseSensitive(sourceFolderParam)
 			destErrorOccured  , destCaseSense   = NNS.isDestFolderCaseSensitive  (destFolderParam  )
-			# ANY_CASE_INSENSITIVE = not sourceCaseSense or not destCaseSense
+			ALL_CASE_SENSITIVE = sourceCaseSense and destCaseSense
 
 			if sourceCaseSense and not destCaseSense: # Most probable scenario: copy from Linux to Windows
 				sourceEntries = checkCaseDuplicates(sourceEntries, sourceErrorOccured, destErrorOccured, NNS.source_designation, NNS.source_str, sourceFolderParam)
-				if not sourceEntries: return
+				if not sourceEntries and not removeNotInSrc: return
 
 			if sortEntries:
 				sourceEntries = sorted(sourceEntries, key=lambda x: x.filename)
@@ -817,7 +810,7 @@ def recursiveCopy(
 				return
 
 			newestDestDate = 0
-			if newerThanNewestFile or newerThanNewestFolder: # find newest file/folder in the destination folder
+			if sourceEntries and (newerThanNewestFile or newerThanNewestFolder): # find newest file/folder in the destination folder
 				if DEST_FILTER_WARN and not destCaseSense:
 					cprint("Warning: When searching for newest file in the destination folder you may have excluded some files/folders case-sensitivly but the destination folder is case-insensitive", COLOR_WARN)
 
@@ -834,20 +827,21 @@ def recursiveCopy(
 					theNewest = f"and the newest from them has date {datetime.fromtimestamp(newestDestDate)} -> newestDestDate" if entryCount else ""
 					print(f"Destination folder has {entryCount}{matching} {filesFolders} {theNewest}")
 
-			# Explanation for following if stament containing destCaseSense:
-			# sourceCaseSense and destCaseSense: (i.e. Linux -> Linux) Both are case-sensitive so no need to normalize case
-			# sourceCaseSense and not destCaseSense: (i.e. Linux -> Windows) Case normalization necessary as Windows is case-insensitive
-			# not sourceCaseSense and destCaseSense: (i.e. Windows -> Linux) No need to normalize case as case-insensitive names are a subset of case-sensitive names
-			# not sourceCaseSense and not destCaseSense: (i.e. Windows -> Windows) Case normalization necessary as both are case-insensitive
-			# So we can se that case normalization is only necessary if not destCaseSense
-			if destCaseSense: destEntriesDict = {entry.filename        : entry for entry in destEntries}
-			else            : destEntriesDict = {entry.filename.lower(): entry for entry in destEntries}
+			# If any of the locations is case-insensitive we have to normalize the case as that is more intuitive
+			if ALL_CASE_SENSITIVE: destEntriesDict = {entry.filename        : entry for entry in destEntries}
+			else                 : destEntriesDict = {entry.filename.lower(): entry for entry in destEntries}
+
+			if removeNotInSrc and destEntries:
+				sourceNames = {entry.filename for entry in sourceEntries}
+				for destEntry in destEntries:
+					if destEntry.filename not in sourceNames:
+						recursiveRemove(destFolderParam, destEntry, NNS.destFolderIter, NNS.destRemove, NNS.destRmdir, NNS.dest_designation, NNS.dest_str)
 
 			for sourceEntry in sourceEntries:
 				name = sourceEntry.filename
 				match recursiveCopyHelper(
 					sourceEntry       = sourceEntry,
-					destEntry         = destEntriesDict.get(name if destCaseSense else name.lower()),
+					destEntry         = destEntriesDict.get(name if ALL_CASE_SENSITIVE else name.lower()),
 					sourceFolderParam = sourceFolderParam,
 					destFolderParam   = destFolderParam,
 					depth             = depth,

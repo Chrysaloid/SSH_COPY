@@ -1,4 +1,4 @@
-# SSH_COPY - 1.6.0
+# SSH_COPY - 1.7.0
 Small collection of Python scripts to easily copy files between devices in the same local network. You must set up DHCP (static IP addresses) in your router settings otherwise the scripts won't work as their setup relies on hardcoded (by You) addresses in the shortcuts or wrapper scripts.
 
 ## Initial setup
@@ -134,7 +134,7 @@ usage: SSH_SYNC.py [-h] -l ABSOLUTE_PATH -r ABSOLUTE_PATH [-i [PATTERN_1 [PATTER
                    [-X [PATTERN_1 [PATTERN_2 ...]]] [-u USERNAME] [-H HOSTNAME] [-p PASSWORD]
                    [-y KEY_FILENAME [KEY_FILENAME ...]] [-P PORT] [-T SECONDS] [-n DATE] [-f DATE]
                    [-R [MAX_RECURSION_DEPTH]] [-S] [-x] [-v] [-s] [-t] [-B] [-d] [-b] [-k] [-K] [-L]
-                   [-G] [-m {sync,copy}] [-F] [-N] [-M] [-D] [-g [FORMAT]] [-j]
+                   [-G] [-z] [-m {sync,copy}] [-F] [-N] [-M] [-D] [-J] [-g [FORMAT]] [-j]
 
 Copy or sync files between folders on remote or local machines
 
@@ -163,21 +163,21 @@ Optional common arguments:
   -A, --exclude-folders-case [PATTERN_1 [PATTERN_2 ...]]
                               Glob patterns for folders to exclude in copy/sync (case-sensitive)
   -V, --include-files-path [PATTERN_1 [PATTERN_2 ...]]
-                              Paths of files to include in copy/sync
+                              Absolute paths of files to include in copy/sync
   -Z, --exclude-files-path [PATTERN_1 [PATTERN_2 ...]]
-                              Paths of files to exclude in copy/sync
+                              Absolute paths of files to exclude in copy/sync
   -Q, --include-files-case-path [PATTERN_1 [PATTERN_2 ...]]
-                              Paths of files to include in copy/sync (case-sensitive)
+                              Absolute paths of files to include in copy/sync (case-sensitive)
   -w, --exclude-files-case-path [PATTERN_1 [PATTERN_2 ...]]
-                              Paths of files to exclude in copy/sync (case-sensitive)
+                              Absolute paths of files to exclude in copy/sync (case-sensitive)
   -U, --include-folders-path [PATTERN_1 [PATTERN_2 ...]]
-                              Paths of folders to include in copy/sync
+                              Absolute paths of folders to include in copy/sync
   -o, --exclude-folders-path [PATTERN_1 [PATTERN_2 ...]]
-                              Paths of folders to exclude in copy/sync
+                              Absolute paths of folders to exclude in copy/sync
   -Y, --include-folders-case-path [PATTERN_1 [PATTERN_2 ...]]
-                              Paths of folders to include in copy/sync (case-sensitive)
+                              Absolute paths of folders to include in copy/sync (case-sensitive)
   -X, --exclude-folders-case-path [PATTERN_1 [PATTERN_2 ...]]
-                              Paths of folders to exclude in copy/sync (case-sensitive)
+                              Absolute paths of folders to exclude in copy/sync (case-sensitive)
   -u, --username USERNAME     Remote username
   -H, --hostname HOSTNAME     Remote host's address
   -p, --password PASSWORD     Remote password
@@ -226,6 +226,8 @@ Optional common arguments:
   -G, --sort-entries          Sort files/folders by name alphabetically before copying. Except for
                               making the logs look more familiar it does not have much other use
                               cases
+  -z, --send2trash            When removing a file send it to trash instead. Aplies only to local
+                              due to SSH limitations
   -m, --mode {sync,copy}      One of values: sync,copy (default: copy)
 
 COPY mode arguments:
@@ -237,6 +239,8 @@ COPY mode arguments:
                               Copy only files newer then the newest folder in the destination folder
   -D, --dont-filter-dest      Don't filter the destination files/folders WHEN SEARCHING FOR THE
                               NEWEST FILE
+  -J, --remove-not-in-src     Remove destination files that are not present in filtered source file
+                              set
 
 SYNC mode arguments:
   -g, --print-common-date [FORMAT]
