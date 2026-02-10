@@ -120,6 +120,7 @@ parser.add_argument("-k", "--listdir-attr-fallback"     , action="store_true"   
 parser.add_argument("-K", "--end-on-inaccessible-entry" , action="store_true"           , help="Terminate the script if it does not have enough perrmisions to access any encountered file/folder (local or remote). If not set ignore such cases but print a warning", dest="endOnInaccessibleEntry")
 parser.add_argument("-L", "--end-on-file-onto-folder"   , action="store_true"           , help="Terminate the script if a file is to be copied onto a folder and vice versa. If not set ignore such cases but print a warning", dest="endOnFileOntoFolder")
 parser.add_argument("-G", "--sort-entries"              , action="store_true"           , help="Sort files/folders by name alphabetically before copying. Except for making the logs look more familiar it does not have much other use cases", dest="sortEntries")
+parser.add_argument("-z", "--send2trash"                , action="store_true"           , help="When removing a file send it to trash instead. Aplies only to local due to SSH limitations")
 # parser.add_argument("-u", "--dry-run"                   , action="store_true"           , help="Only create directories and disable all file copying operations and only print the output that would normally get printed", dest="dryRun")
 
 parser.add_argument("-m", "--mode", default="copy", choices=MODE_DICT.keys(), type=str.lower, help=f'One of values: {",".join(MODE_DICT.keys())} (default: copy)')
@@ -166,6 +167,7 @@ listdirAttrFallback    : bool               = args.listdirAttrFallback
 endOnInaccessibleEntry : bool               = args.endOnInaccessibleEntry
 endOnFileOntoFolder    : bool               = args.endOnFileOntoFolder
 sortEntries            : bool               = args.sortEntries
+shouldSend2trash       : bool               = args.send2trash
 printCommonDate        : str                = args.printCommonDate
 commonDateFromFolders  : bool               = args.commonDateFromFolders
 # dryRun                 : bool               = args.dryRun
@@ -273,6 +275,11 @@ if not LOCAL_IS_SOURCE or not REMOTE_IS_REMOTE:
 	else:
 		assertFolderExists(destFolder, "\nYou can create it by specifying the -S/--create-dest-folder parameter")
 
+localRemove = os.remove
+if shouldSend2trash:
+	from send2trash import send2trash
+	def localRemove(path: str): send2trash(os.path.normpath(path))
+
 def isFolderCaseSensitiveBase(
 	isWindows: bool,
 	realFunc: Callable,
@@ -342,7 +349,7 @@ if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 		copySourceDest = sftp.put
 		copyDestSource = sftp.get
 
-		sourceRemove = os.remove
+		sourceRemove = localRemove
 		destRemove = sftp.remove
 
 		sourceRmdir = os.rmdir
@@ -371,7 +378,7 @@ if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 		copyDestSource = sftp.put
 
 		sourceRemove = sftp.remove
-		destRemove = os.remove
+		destRemove = localRemove
 
 		sourceRmdir = sftp.rmdir
 		destRmdir = os.rmdir
@@ -397,8 +404,8 @@ else: # remoteFolder ACTUALLY refers to a LOCAL folder
 	copySourceDest = shutil.copyfile
 	copyDestSource = shutil.copyfile
 
-	sourceRemove = os.remove
-	destRemove   = os.remove
+	sourceRemove = localRemove
+	destRemove   = localRemove
 
 	sourceRmdir = os.rmdir
 	destRmdir   = os.rmdir
