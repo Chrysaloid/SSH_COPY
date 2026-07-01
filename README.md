@@ -1,4 +1,4 @@
-# SSH_COPY - 1.7.1
+# SSH_COPY - 1.8.0
 Small collection of Python scripts to easily copy files between devices in the same local network. You must set up DHCP (static IP addresses) in your router settings otherwise the scripts won't work as their setup relies on hardcoded (by You) addresses in the shortcuts or wrapper scripts.
 
 ## Initial setup
@@ -302,6 +302,92 @@ Syncing files:
 source -> destination: /SSH_SYNC.py
 
 Execution time: 0.156 s
+```
+
+## SSH_SYNC_BULK.py
+This script is for when you want to sync multiple folders in different places. Currently `SSH_SYNC.py` is unable to do that as it has single input folder and single output folder and can only perform recursion. You have to do a lot of exclusions if you want to sync multiple folders in different locations on the drive (you start from root and exclude your way to the said folders and the script would have to potentially do large amounts of unnecessary navigation) and **you have to** launch the script multiple times if the folders are on different drives on Windows. That's why this script was made. It is simpler than `SSH_SYNC.py`:
+
+- It does not perform recursion and does not copy folders (it also won't create empty subfolders in the destination).
+- Case-insensitivity of file names on Windows was ignored - use `fsutil file setCaseSensitiveInfo "C:/path to folder" enable` to enable case-sensitivity for your folder(s) if you care about the edge-cases.
+- It lacks some functionality of `SSH_SYNC.py` but is enough for my current use-case so I am not going adding it at the moment.
+- It requires working python 3 on the remote machine for fast directory listing.
+
+The main part of using the script is specifying multiple `--operation` arguments of signature `SOURCE_DIR SOURCE_PLACE DEST_DIR DEST_PLACE MODE FILE_PATTERNS DEFAULT_MATCH` (all copying operations are on condition that only a newer version of the file will overwrite an older version of the file):
+
+- `SOURCE_DIR` - Source directory absolute path
+- `SOURCE_PLACE` - Where is this folder? (r, remote) or (l, local)
+- `DEST_DIR` - Destination directory absolute path
+- `DEST_PLACE` - Where is this folder? (r, remote) or (l, local)
+- `MODE` - Mode of operation:
+	- s, sync - synchronization, files are copied both ways according to the following rules:
+		- first newest common date is determined. "common" means a pair of files that both have the same name and the same modification date
+		- then for files newer than that date if there is no matching file in the other folder then the file is copied to that folder
+		- then for files newer than that date if there is no matching file in the other folder then the file is deleted
+	- c, copy - files are copied from the source to the destination
+	- m, move - files are moved from the source to the destination (first copied and then source is deleted)
+- `FILE_PATTERNS` - a 2-column table of glob patterns and their matching values. I.e. `"*.png/true|*.jpg/false"`. Rows are delimited by `|` and columns are delimited by `/`. `fnmatchcase` is used to match filenames to the patterns. Boolean true means that files that match the pattern will be included in the copy and false means that they will be excluded in the copy. You can use `"1" | "true" | "t" | "yes" | "yeah" | "yup" | "tak" | "on"` as true values and `"0" | "false" | "f" | "no" | "nah" | "nope" | "nie" | "off"` as false values
+- `DEFAULT_MATCH` - if none of the patterns match this will be used to determine if file should be copied
+
+Examples scripts `ssh-sync-bulk-example.bat`, `ssh-sync-bulk-example.sh` and `ssh-sync-bulk-example.py` demonstrate usage of this script. Python example avoids calling `argparse`'s `parse_args()` and is therefore a bit faster.
+
+**Full help output:**
+
+```
+usage: SSH_SYNC_BULK.py [-h]
+                        -o SOURCE_DIR SOURCE_PLACE DEST_DIR DEST_PLACE MODE FILE_PATTERNS DEFAULT_MATCH
+                        -u USERNAME -H HOSTNAME [-p PASSWORD] [-P PORT] [-T SECONDS] [-v] [-s] [-d]
+                        [-O REMOTEOS] [-c]
+
+Copy, move or sync files between folders on remote or local machines
+
+Required arguments:
+  -o, --operation SOURCE_DIR SOURCE_PLACE DEST_DIR DEST_PLACE MODE FILE_PATTERNS DEFAULT_MATCH
+                              Operation to perform. Can be specified multiple times
+  -u, --username USERNAME     Remote username
+  -H, --hostname HOSTNAME     Remote host's address
+
+Optional arguments:
+  -h, --help                  show this help message and exit
+  -p, --password PASSWORD     Remote password
+  -P, --port PORT             Remote port (default: 22)
+  -T, --timeout SECONDS       TCP 3-way handshake timeout in seconds (default: 5.0)
+  -v, --verbose               Print verbose information. Good for debugging
+  -s, --silent                Print only errors
+  -d, --dry-run               Do not perform any copying and just print the information that would
+                              normally be printed. Good for testing
+  -O, --remote-os REMOTEOS    Remote host's operating system. Can be (a, auto, auto-detect) or (w,
+                              win, windows) or (u, unix, l, linux, p, posix, m, macos). Windows just
+                              needs to be handled in a special way so we need to differentiate it
+                              from the others. Auto will run a few commands on the remote machine to
+                              determine it's OS and they are not 100% relaible so if you know the
+                              remote's OS and want to save time you can use this argument (default:
+                              auto)
+  -c, --cache-directory-listings
+                              Listing all entries in a directory is a bit expensive operation so
+                              caching speeds up the copying process but it may result in omitting
+                              some files in more complex setups (i.e. for folders [A: 1 file, B:
+                              empty, C: empty] and operations ['copy from A to B', 'copy from B to
+                              C'] running the script would result in folder C still being empty
+                              because cached empty listing of folder B would be used in the second
+                              operation). To reduce confusion the caching is disabled by default and
+                              you have to enable it using this flag
+```
+
+**Example of successful output in `SYNC` mode:**
+
+```
+Attempting to connect to Test@192.168.0.121 ...
+
+# Source (REMOTE): G:/Test/Nowy folder/Source
+# Dest   (LOCAL ): G:/Test/Nowy folder/Destination
+# Mode: SYNC
+# File patterns: *.txt | defaultMatch
+# Source file count: 2
+# Dest   file count: 1
+# Newest common date: 2025-10-05 14:48:24 - 8.9 months ago
+S -> D: Nowy dokument tekstowy — kopia.txt
+
+Execution time: 0.349 s
 ```
 
 ## ~~SSH_GET.py~~

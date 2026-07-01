@@ -1,5 +1,5 @@
 # region #* IMPORTS
-from pathlib import Path; __package__ = Path(__file__).resolve().parent.name # To be able to use relative imports
+import sys; from pathlib import Path; p = Path(__file__).resolve().parent; __package__ = p.name; sys.path.append(p.parent.as_posix()) # To be able to use relative imports
 
 import argparse
 from collections import defaultdict
@@ -11,13 +11,13 @@ import os
 import posixpath
 import shutil
 import sys
-import time
+from time import perf_counter
 from typing import Callable, List, Tuple
 
 import paramiko
 from termcolor import colored as clr, cprint
 
-start = time.perf_counter()
+start = perf_counter()
 
 from .argparseUtils import ArgumentParser_ColoredError, COMMON_FORMATTER_CLASS, IncludeExcludeAction, NameFilter, NoRepeatAction
 from .commonConstants import COLOR_EMPHASIS, COLOR_ERROR, COLOR_OK, COLOR_WARN
@@ -52,7 +52,7 @@ else:
 	print(f"\33]0;{TITLE}\a", end="", flush=True) # Hide title
 
 # region #* PARAMETER PARSING
-parser = ArgumentParser_ColoredError( # Remaining letter pargument names: O W h m q
+parser = ArgumentParser_ColoredError( # Remaining letter argument names: O W h m q
 	description="Copy or sync files between folders on remote or local machines",
 	formatter_class=COMMON_FORMATTER_CLASS,
 )
@@ -978,7 +978,7 @@ if REMOTE_IS_REMOTE:
 	ssh.close()
 
 if not silent:
-	print(f"\nExecution time: {time.perf_counter() - start:.3f} s")
+	print(f"\nExecution time: {perf_counter() - start:.3f} s")
 
 if dontClose:
 	if silent:

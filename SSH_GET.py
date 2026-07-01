@@ -1,4 +1,4 @@
-from pathlib import Path; __package__ = Path(__file__).resolve().parent.name # To be able to use relative imports
+import sys; from pathlib import Path; p = Path(__file__).resolve().parent; __package__ = p.name; sys.path.append(p.parent.as_posix()) # To be able to use relative imports
 
 import argparse
 import json

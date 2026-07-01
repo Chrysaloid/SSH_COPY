@@ -3,7 +3,21 @@ from pathlib import Path; __package__ = Path(__file__).resolve().parent.name # T
 import socket
 
 import paramiko
-from paramiko.ssh_exception import AuthenticationException, BadHostKeyException, NoValidConnectionsError, PartialAuthentication, SSHException
+from paramiko.ssh_exception import (
+	AuthenticationException,
+	BadAuthenticationType,
+	BadHostKeyException,
+	ChannelException,
+	ConfigParseError,
+	CouldNotCanonicalize,
+	IncompatiblePeer,
+	MessageOrderError,
+	NoValidConnectionsError,
+	PartialAuthentication,
+	PasswordRequiredException,
+	ProxyCommandFailure,
+	SSHException
+)
 from termcolor import colored as clr
 
 from .fileUtils import isDir, iteratePathParts
@@ -18,7 +32,7 @@ def getSSH(
 	timeout: float = 5,
 	port = 22,
 	silent = False
-):
+) -> paramiko.SSHClient:
 	ssh = paramiko.SSHClient()
 	ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -44,8 +58,34 @@ def getSSH(
 		errorMessage = f"ERROR: Socket error while connecting to {hostname}: {e}"
 	except NoValidConnectionsError:
 		errorMessage = f"ERROR: No valid connections could be made to {hostname} (connection refused or unreachable)"
-	except SSHException:
-		errorMessage = f"ERROR: General SSH error occurred while connecting to {hostname} (probably timeout after {timeout} seconds)"
+	except PasswordRequiredException:
+		errorMessage = f"ERROR: The private key is encrypted and requires a passphrase"
+	except BadAuthenticationType as e:
+		errorMessage = f"ERROR: Unsupported authentication type. Allowed types: {", ".join(e.allowed_types)}"
+	except ProxyCommandFailure as e:
+		errorMessage = f"ERROR: Proxy command failed: {e}"
+	except FileNotFoundError as e:
+		errorMessage = f"ERROR: SSH key file not found: {e.filename}"
+	except socket.timeout:
+		errorMessage = f"ERROR: Connection to {hostname} timed out after {timeout} seconds"
+	except TimeoutError:
+		errorMessage = f"ERROR: Connection to {hostname} timed out after {timeout} seconds"
+	except ChannelException as e:
+		errorMessage = f"ERROR: Failed to open an SSH channel while connecting to {hostname} (channel {e.code}: {e.text})"
+	except ConfigParseError:
+		errorMessage = f"ERROR: Failed to parse the SSH configuration file"
+	except CouldNotCanonicalize:
+		errorMessage = f"ERROR: Failed to canonicalize the hostname {hostname}"
+	except IncompatiblePeer:
+		errorMessage = f"ERROR: SSH negotiation failed because {hostname} is incompatible with this SSH client"
+	except MessageOrderError:
+		errorMessage = f"ERROR: Invalid SSH message order was received from {hostname}"
+	except SSHException as e:
+		msg = str(e)
+		if "No authentication method" in msg:
+			errorMessage = f"ERROR: No authentication method available. No password was supplied and no usable SSH keys were found"
+		else:
+			errorMessage = f"ERROR: SSH error while connecting to {hostname}: {msg}"
 
 	if errorMessage:
 		raise SimpleError(errorMessage)
@@ -150,7 +190,7 @@ class RemoteListDir:
 			self.stdin.write(path + "\n")
 			self.stdin.flush()
 		except OSError: # Socket is closed (probably because remote python crashed because the scanned folder was inaccessible because script did not have suficent permissions)
-			self.stdin = None # reset stdin so the remote script gets recreated on the next use # TODO find a better solution to this
+			self.stdin = None # reset stdin so the remote script gets recreated on the next use # TODO find a better solution for this
 			raise SimpleError(
 				f'RemoteListDir.listdir_attr: remote script returned error when listing folder "{path}":\n{ \
 				self.stderr.read().decode(errors="ignore").strip() \

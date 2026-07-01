@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd "<path_to_SSH_COPY_folder>"
+# cd "<path_to_SSH_COPY_folder>"
 
 # This way you can (un)comment out individual lines and move arguments around easily
 args=(

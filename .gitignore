@@ -184,3 +184,5 @@ SSH SYNC TEST.py
 SSH_CLIP.py
 handle-non-abs-paths.py
 handle-non-abs-paths-test.txt
+.isort.cfg
+ssh-sync-bulk-launcher.py
