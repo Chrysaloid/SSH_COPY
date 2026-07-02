@@ -52,9 +52,10 @@ class PaddedIntEnum(IntEnum):
 		raise SimpleError(f"Invalid {cls.name}: {txt}")
 
 class MODE(PaddedIntEnum):
-	SYNC = auto()
-	COPY = auto()
-	MOVE = auto()
+	SYNC     = auto()
+	COPY     = auto()
+	DEL_COPY = auto()
+	MOVE     = auto()
 
 class PLACE(PaddedIntEnum):
 	LOCAL = auto()
@@ -208,12 +209,14 @@ def main(args: Namespace = None):
 			destDir: str,
 			command: str,
 			printFiles = False,
+			printColor = "green",
 		) -> None:
 			self.files: list[str] = []
 			self.sourceDir = sourceDir
 			self.destDir = destDir
 			self.command = command
 			self.printFiles = printFiles
+			self.printColor = printColor
 
 		def __call__(self, filename: str, _) -> None:
 			self.files.append(filename)
@@ -237,7 +240,7 @@ def main(args: Namespace = None):
 					raise RuntimeError(f"Remote copy failed:\n{stdout.read().decode()}\n{stderr.read().decode()}")
 
 			if self.printFiles and not silent:
-				cprint("\n".join(self.files), "green")
+				cprint("\n".join(self.files), self.printColor)
 
 	def filterFun(file: LocalSFTPAttributes, filePatterns: Tuple[Tuple[str, bool], ...], defaultMatch: bool) -> bool:
 		if isDir(file): return False # this script is supposed to be simple so no recursion is performed
@@ -391,6 +394,41 @@ def main(args: Namespace = None):
 				copy(sPath, dPath)
 				utime(dPath, (file.st_atime, file.st_mtime))
 
+	def delCopyFun(sourceFiles: list[LocalSFTPAttributes], sourcePlace: PLACE, destFiles: dict[str, LocalSFTPAttributes], destPlace: PLACE, sourceDir: str, destDir: str):
+		if sourcePlace == PLACE.LOCAL and destPlace == PLACE.LOCAL:
+			copy = bindKwarg(shutil.copyfile, follow_symlinks=False)
+			utime = os.utime
+			removeDest = os.remove
+		elif sourcePlace == PLACE.REMOTE and destPlace == PLACE.LOCAL:
+			copy = sftp.get
+			utime = os.utime
+			removeDest = os.remove
+		elif sourcePlace == PLACE.LOCAL and destPlace == PLACE.REMOTE:
+			copy = bindKwarg(sftp.put, confirm=False)
+			utime = sftp.utime
+			removeDest = sftp.remove
+		elif sourcePlace == PLACE.REMOTE and destPlace == PLACE.REMOTE: #TODO correct this part as it does not do proper DEL_COPY
+			copy = RemoteCopyBatch(sourceDir, destDir, "cp -u", True)
+			copy.files = map(getAttr("filename"), sourceFiles)
+			copy.finalize()
+			return
+
+		for file in sourceFiles:
+			destFile = destFiles.pop(file.filename, None)
+			if destFile and destFile.st_mtime >= file.st_mtime: continue # destination exists and is newer or the same -> skip
+			if not silent: cprint(file.filename, "green")
+			if not dryRun:
+				sPath = pathJoin(sourceDir, file.filename)
+				dPath = pathJoin(destDir  , file.filename)
+				copy(sPath, dPath)
+				utime(dPath, (file.st_atime, file.st_mtime))
+
+		for file in destFiles.values():
+			if not silent: cprint(file.filename, "red")
+			if not dryRun:
+				dPath = pathJoin(destDir, file.filename)
+				removeDest(dPath)
+
 	def moveFun(sourceFiles: list[LocalSFTPAttributes], sourcePlace: PLACE, destPlace: PLACE, sourceDir: str, destDir: str):
 		if sourcePlace == PLACE.LOCAL and destPlace == PLACE.LOCAL:
 			move = shutil.move
@@ -466,7 +504,7 @@ def main(args: Namespace = None):
 
 		if not silent: print(f"# {magentaSource} file count: {len(sourceFiles)}")
 
-		if not sourceFiles and (mode == MODE.COPY or mode == MODE.MOVE):
+		if not sourceFiles and mode != MODE.SYNC:
 			continue
 
 		if mode == MODE.SYNC and isinstance(sourceFiles, tuple):
@@ -474,7 +512,7 @@ def main(args: Namespace = None):
 		elif mode != MODE.SYNC and isinstance(sourceFiles, dict):
 			sourceFiles = sourceFiles.values()
 
-		if mode == MODE.SYNC or mode == MODE.COPY:
+		if mode != MODE.MOVE:
 			destFiles = destDirListCache.get(destDir)
 			if destFiles is None:
 				destFiles: list[LocalSFTPAttributes] = local_listdir_attr(destDir) if destPlace == PLACE.LOCAL else remote_listdir_attr(destDir)
@@ -487,9 +525,10 @@ def main(args: Namespace = None):
 				continue
 
 		match mode:
-			case MODE.SYNC: syncFun(sourceFiles, sourcePlace, destFiles, destPlace, sourceDir, destDir)
-			case MODE.COPY: copyFun(sourceFiles, sourcePlace, destFiles, destPlace, sourceDir, destDir)
-			case MODE.MOVE: moveFun(sourceFiles, sourcePlace, destPlace, sourceDir, destDir)
+			case MODE.SYNC    : syncFun   (sourceFiles, sourcePlace, destFiles, destPlace, sourceDir, destDir)
+			case MODE.COPY    : copyFun   (sourceFiles, sourcePlace, destFiles, destPlace, sourceDir, destDir)
+			case MODE.DEL_COPY: delCopyFun(sourceFiles, sourcePlace, destFiles, destPlace, sourceDir, destDir)
+			case MODE.MOVE    : moveFun   (sourceFiles, sourcePlace,            destPlace, sourceDir, destDir)
 			case _: raise SimpleError(f"Invalid mode: {mode}")
 
 	sftp.close()
