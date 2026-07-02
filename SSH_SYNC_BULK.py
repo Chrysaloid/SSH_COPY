@@ -177,7 +177,7 @@ def main(args: Namespace = None):
 			if sourcePlace == PLACE.LOCAL: assertLocalFolderExists(sourceDir)
 			if destPlace   == PLACE.LOCAL: assertLocalFolderExists(destDir)
 			mode         = MODE.parseMember(mode)
-			filePatterns = tuple(map(parseFilePattern, filePatterns.split("|")))
+			filePatterns = tuple(map(parseFilePattern, filePatterns.split("|"))) if filePatterns else []
 			defaultMatch = parseBool(defaultMatch, "defaultMatch")
 			parsedOperations.append((sourceDir, sourcePlace, destDir, destPlace, mode, filePatterns, defaultMatch))
 	else:
