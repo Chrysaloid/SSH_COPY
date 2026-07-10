@@ -7,6 +7,7 @@ import posixpath
 
 from termcolor import colored as clr
 
+from .argparseUtils import ArgumentParser_ColoredError, COMMON_FORMATTER_CLASS
 from .commonConstants import COLOR_OK
 from .getPlatform import WINDOWS
 from .SimpleError import SimpleError
@@ -21,7 +22,10 @@ if WINDOWS:
 else:
 	print(f"\33]0;{TITLE}\a", end="", flush=True) # Hide title
 
-parser = argparse.ArgumentParser(description="Parse connection details")
+parser = ArgumentParser_ColoredError(
+	description="Copies selected files (and folders recursively) in Windows Explorer or Nautilus from a folder on a remote machine.",
+	formatter_class=COMMON_FORMATTER_CLASS,
+)
 
 parser.add_argument("-u", "--username"               , required=True, help="Remote username")
 parser.add_argument("-H", "--hostname"               , required=True, help="Remote host's address")
@@ -30,7 +34,7 @@ parser.add_argument("-l", "--local-folder"           , required=True, help="Loca
 parser.add_argument("-r", "--remote-get-files-script", required=True, help="Remote getSelectedFilesFromExplorerRecurseStdOut.py absolute path", dest="remoteGetFilesScript")
 
 parser.add_argument("-P", "--port"          , default=22, type=int , help="Remote port (default: 22)")
-parser.add_argument("-T", "--timeout"       , default=1, type=float, help="TCP 3-way handshake timeout in seconds (default: 1)")
+parser.add_argument("-T", "--timeout"       , default=5, type=float, help="TCP 3-way handshake timeout in seconds (default: 5.0)")
 parser.add_argument("-t", "--preserve-times", action="store_true"  , help="If set, modification times will be preserved", dest="preserveTimes")
 parser.add_argument("-d", "--dont-close"    , action="store_true"  , help="Don't auto-close console window at the end if no error occurred. You will have to close it manually or by pressing ENTER", dest="dontClose")
 
@@ -51,7 +55,7 @@ if not os.path.isdir(localFolder):
 else:
 	localFolder = localFolder.replace("\\", "/")
 
-ssh = getSSH(username, hostname, password, timeout, port)
+ssh, thereWasError = getSSH(username, hostname, password, timeout, port)
 
 stdIn, stdOut, stdErr = ssh.exec_command(f'python "{remoteGetFilesScript}"')
 
@@ -95,5 +99,5 @@ print(f"\nSuccessfully got {clr(len(files), COLOR_OK)} file(s)\n")
 sftp.close()
 ssh.close()
 
-if dontClose:
+if dontClose or thereWasError:
 	input(clr("\nPress ENTER to continue...", COLOR_OK))

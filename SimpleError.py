@@ -19,7 +19,7 @@ class SimpleError(Exception):
 
 def custom_excepthook(exc_type, exc_value, exc_traceback):
 	if issubclass(exc_type, SimpleError):
-		print(exc_value)
+		if exc_value.message: print(exc_value.message)
 	else: # fallback to normal behavior
 		sys.__excepthook__(exc_type, exc_value, exc_traceback)
 

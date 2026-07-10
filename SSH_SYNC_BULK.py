@@ -140,7 +140,7 @@ def main(args: Namespace = None):
 			dest="operations",
 		)
 		required.add_argument("-u", "--username", required=True, default="", help="Remote username")
-		required.add_argument("-H", "--hostname", required=True, default="", help="Remote host's address")
+		required.add_argument("-H", "--hostname", required=True, default="", nargs="+", help="Remote host's address. You can specify multiple if host can appear under multiple adresses")
 
 		parser._optionals.title = "Optional arguments"
 
@@ -184,13 +184,13 @@ def main(args: Namespace = None):
 	else:
 		parsedOperations = operations
 
-	ssh = getSSH(
-		username = username,
-		hostname = hostname,
-		password = password,
-		timeout  = timeout ,
-		port     = port    ,
-		silent   = silent  ,
+	ssh, thereWasError = getSSH(
+		username  = username,
+		hostnames = hostname,
+		password  = password,
+		timeout   = timeout ,
+		port      = port    ,
+		silent    = silent  ,
 	)
 	sftp = ssh.open_sftp()
 

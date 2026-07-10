@@ -28,14 +28,14 @@ required = parser.add_argument_group("Required arguments")
 parser._action_groups = [required, parser._optionals]
 
 required.add_argument("-u", "--username"     , required=True, help="Remote username")
-required.add_argument("-H", "--hostname"     , required=True, help="Remote host's address")
+required.add_argument("-H", "--hostname"     , required=True, nargs="+", help="Remote host's address. You can specify multiple if host can appear under multiple adresses")
 required.add_argument("-p", "--password"     , required=True, help="Remote password")
 required.add_argument("-r", "--remote-folder", required=True, help="Remote folder's absolute path", dest="remoteFolder")
 
 parser._optionals.title = "Optional arguments"
 
 parser.add_argument("-P", "--port"          , default=22, type=int, help="Remote port (default: 22)")
-parser.add_argument("-T", "--timeout"       , default=5, type=float, help="TCP 3-way handshake timeout in seconds (default: 5)", metavar="SECONDS")
+parser.add_argument("-T", "--timeout"       , default=5.0, type=float, help="TCP 3-way handshake timeout in seconds (default: 5.0)", metavar="SECONDS")
 parser.add_argument("-t", "--preserve-times", action="store_true" , help="If set, modification times will be preserved", dest="preserveTimes")
 parser.add_argument("-0", "--zero-file"     , action="store_true" , help="Create a file named 0 at the end of transfer. Useful for file-watching scripts on the remote machine", dest="zeroFile")
 parser.add_argument("-c", "--end-command"   , help="Command to run on the remote machine after file transfer", dest="endCommand")
@@ -73,12 +73,12 @@ else:
 selectedFiles = getSelectedFilesFromExplorer() if WINDOWS else getSelectedFilesFromStdIn()
 
 # Main upload process
-ssh = getSSH(
-	username = username,
-	hostname = hostname,
-	password = password,
-	timeout  = timeout ,
-	port     = port
+ssh, thereWasError = getSSH(
+	username  = username,
+	hostnames = hostname,
+	password  = password,
+	timeout   = timeout ,
+	port      = port    ,
 )
 sftp = ssh.open_sftp()
 
@@ -144,5 +144,5 @@ print(f"Execution time: {time.time() - start:.3f} s")
 if exitStatus:
 	exit(exitStatus)
 
-if dontClose:
+if dontClose or thereWasError:
 	input(clr("\nPress ENTER to continue...", COLOR_OK))

@@ -100,11 +100,11 @@ parser.add_argument("-o", "--exclude-folders-path"     , default=[], action=Incl
 parser.add_argument("-Y", "--include-folders-case-path", default=[], action=IncludeExcludeAction, nargs="*", help="Absolute paths of folders to include in copy/sync (case-sensitive)", dest="inExcludeFolders", metavar=("PATTERN_1", "PATTERN_2"))
 parser.add_argument("-X", "--exclude-folders-case-path", default=[], action=IncludeExcludeAction, nargs="*", help="Absolute paths of folders to exclude in copy/sync (case-sensitive)", dest="inExcludeFolders", metavar=("PATTERN_1", "PATTERN_2"))
 parser.add_argument("-u", "--username"                  , default=""                    , help="Remote username")
-parser.add_argument("-H", "--hostname"                  , default=""                    , help="Remote host's address")
+parser.add_argument("-H", "--hostname"                  , default=""                    , nargs="+", help="Remote host's address. You can specify multiple if host can appear under multiple adresses")
 parser.add_argument("-p", "--password"                  , default=None                  , help="Remote password")
 parser.add_argument("-y", "--key-filename"              , default=[], action="extend"   , nargs="+", type=str, help="Path to local OpenSSH private-key", dest="keyFilename", metavar="KEY_FILENAME")
 parser.add_argument("-P", "--port"                      , default=22, type=int          , help="Remote port (default: 22)")
-parser.add_argument("-T", "--timeout"                   , default=5, type=float         , help="TCP 3-way handshake timeout in seconds (default: 5)", metavar="SECONDS")
+parser.add_argument("-T", "--timeout"                   , default=5, type=float         , help="TCP 3-way handshake timeout in seconds (default: 5.0)", metavar="SECONDS")
 parser.add_argument("-n", "--files-newer-than"          , default=""                    , help="Copy/Sync only files newer then this date"  , dest="filesNewerThan"  , metavar="DATE")
 parser.add_argument("-f", "--folders-newer-than"        , default=""                    , help="Copy/Sync only folders newer then this date", dest="foldersNewerThan", metavar="DATE")
 parser.add_argument("-R", "--recursive"                 , const=sys.maxsize, nargs="?", type=int, help='Recurse into subdirectories. Optionaly takes max recursion depth as parameter. The source and destination folders are considered as depth == 0 so specifying "--recursive 0" is the same as not specyfying it at all', dest="maxRecursionDepth", metavar="MAX_RECURSION_DEPTH")
@@ -304,9 +304,9 @@ def isFolderCaseSensitiveBase(
 	return (errorOccured, caseSense)
 
 if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
-	ssh = getSSH(
+	ssh, thereWasError = getSSH(
 		username    = username   ,
-		hostname    = hostname   ,
+		hostnames   = hostname   ,
 		password    = password   ,
 		keyFilename = keyFilename,
 		timeout     = timeout    ,
@@ -980,7 +980,7 @@ if REMOTE_IS_REMOTE:
 if not silent:
 	print(f"\nExecution time: {perf_counter() - start:.3f} s")
 
-if dontClose:
+if dontClose or thereWasError:
 	if silent:
 		input("")
 	else:

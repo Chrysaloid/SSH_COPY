@@ -1,4 +1,4 @@
-# SSH_COPY - 1.8.0
+# SSH_COPY - 1.9.0
 Small collection of Python scripts to easily copy files between devices in the same local network. You must set up DHCP (static IP addresses) in your router settings otherwise the scripts won't work as their setup relies on hardcoded (by You) addresses in the shortcuts or wrapper scripts.
 
 ## Initial setup
@@ -55,15 +55,17 @@ Then in Nautilus you can select file(s) and/or folder(s) and right click and the
 **Full help output:**
 
 ```
-usage: SSH_SEND.py [-h] -u USERNAME -H HOSTNAME -p PASSWORD -r REMOTEFOLDER [-P PORT] [-T SECONDS]
-                   [-t] [-0] [-c ENDCOMMAND] [-d] [-i]
+usage: SSH_SEND.py [-h] -u USERNAME -H HOSTNAME [HOSTNAME ...] -p PASSWORD -r REMOTEFOLDER [-P PORT]
+                   [-T SECONDS] [-t] [-0] [-c ENDCOMMAND] [-d] [-i]
 
 Copies selected files (and folders recursively) in Windows Explorer or Nautilus to a folder on a
 remote machine.
 
 Required arguments:
   -u, --username USERNAME     Remote username
-  -H, --hostname HOSTNAME     Remote host's address
+  -H, --hostname HOSTNAME [HOSTNAME ...]
+                              Remote host's address. You can specify multiple if host can appear
+                              under multiple adresses
   -p, --password PASSWORD     Remote password
   -r, --remote-folder REMOTEFOLDER
                               Remote folder's absolute path
@@ -71,7 +73,7 @@ Required arguments:
 Optional arguments:
   -h, --help                  show this help message and exit
   -P, --port PORT             Remote port (default: 22)
-  -T, --timeout SECONDS       TCP 3-way handshake timeout in seconds (default: 5)
+  -T, --timeout SECONDS       TCP 3-way handshake timeout in seconds (default: 5.0)
   -t, --preserve-times        If set, modification times will be preserved
   -0, --zero-file             Create a file named 0 at the end of transfer. Useful for file-watching
                               scripts on the remote machine
@@ -131,10 +133,11 @@ usage: SSH_SYNC.py [-h] -l ABSOLUTE_PATH -r ABSOLUTE_PATH [-i [PATTERN_1 [PATTER
                    [-Z [PATTERN_1 [PATTERN_2 ...]]] [-Q [PATTERN_1 [PATTERN_2 ...]]]
                    [-w [PATTERN_1 [PATTERN_2 ...]]] [-U [PATTERN_1 [PATTERN_2 ...]]]
                    [-o [PATTERN_1 [PATTERN_2 ...]]] [-Y [PATTERN_1 [PATTERN_2 ...]]]
-                   [-X [PATTERN_1 [PATTERN_2 ...]]] [-u USERNAME] [-H HOSTNAME] [-p PASSWORD]
-                   [-y KEY_FILENAME [KEY_FILENAME ...]] [-P PORT] [-T SECONDS] [-n DATE] [-f DATE]
-                   [-R [MAX_RECURSION_DEPTH]] [-S] [-x] [-v] [-s] [-t] [-B] [-d] [-b] [-k] [-K] [-L]
-                   [-G] [-z] [-m {sync,copy}] [-F] [-N] [-M] [-D] [-J] [-g [FORMAT]] [-j]
+                   [-X [PATTERN_1 [PATTERN_2 ...]]] [-u USERNAME] [-H HOSTNAME [HOSTNAME ...]]
+                   [-p PASSWORD] [-y KEY_FILENAME [KEY_FILENAME ...]] [-P PORT] [-T SECONDS]
+                   [-n DATE] [-f DATE] [-R [MAX_RECURSION_DEPTH]] [-S] [-x] [-v] [-s] [-t] [-B] [-d]
+                   [-b] [-k] [-K] [-L] [-G] [-z] [-m {sync,copy}] [-F] [-N] [-M] [-D] [-J]
+                   [-g [FORMAT]] [-j]
 
 Copy or sync files between folders on remote or local machines
 
@@ -179,12 +182,14 @@ Optional common arguments:
   -X, --exclude-folders-case-path [PATTERN_1 [PATTERN_2 ...]]
                               Absolute paths of folders to exclude in copy/sync (case-sensitive)
   -u, --username USERNAME     Remote username
-  -H, --hostname HOSTNAME     Remote host's address
+  -H, --hostname HOSTNAME [HOSTNAME ...]
+                              Remote host's address. You can specify multiple if host can appear
+                              under multiple adresses
   -p, --password PASSWORD     Remote password
   -y, --key-filename KEY_FILENAME [KEY_FILENAME ...]
                               Path to local OpenSSH private-key
   -P, --port PORT             Remote port (default: 22)
-  -T, --timeout SECONDS       TCP 3-way handshake timeout in seconds (default: 5)
+  -T, --timeout SECONDS       TCP 3-way handshake timeout in seconds (default: 5.0)
   -n, --files-newer-than DATE
                               Copy/Sync only files newer then this date
   -f, --folders-newer-than DATE
@@ -335,8 +340,8 @@ Examples scripts `ssh-sync-bulk-example.bat`, `ssh-sync-bulk-example.sh` and `ss
 ```
 usage: SSH_SYNC_BULK.py [-h]
                         -o SOURCE_DIR SOURCE_PLACE DEST_DIR DEST_PLACE MODE FILE_PATTERNS DEFAULT_MATCH
-                        -u USERNAME -H HOSTNAME [-p PASSWORD] [-P PORT] [-T SECONDS] [-v] [-s] [-d]
-                        [-O REMOTEOS] [-c]
+                        -u USERNAME -H HOSTNAME [HOSTNAME ...] [-p PASSWORD] [-P PORT] [-T SECONDS]
+                        [-v] [-s] [-d] [-O REMOTEOS] [-c]
 
 Copy, move or sync files between folders on remote or local machines
 
@@ -344,7 +349,9 @@ Required arguments:
   -o, --operation SOURCE_DIR SOURCE_PLACE DEST_DIR DEST_PLACE MODE FILE_PATTERNS DEFAULT_MATCH
                               Operation to perform. Can be specified multiple times
   -u, --username USERNAME     Remote username
-  -H, --hostname HOSTNAME     Remote host's address
+  -H, --hostname HOSTNAME [HOSTNAME ...]
+                              Remote host's address. You can specify multiple if host can appear
+                              under multiple adresses
 
 Optional arguments:
   -h, --help                  show this help message and exit
@@ -402,20 +409,24 @@ Setup and usage is very similar `SSH_SEND.py` so we only put the help print here
 **Full help output:**
 
 ```
-usage: SSH_GET.py [-h] -u USERNAME -H HOSTNAME -p PASSWORD -l LOCALFOLDER
-                  -r REMOTEGETFILESSCRIPT [-P PORT] [-T TIMEOUT] [-t] [-d]
+usage: SSH_GET.py [-h] -u USERNAME -H HOSTNAME -p PASSWORD -l LOCALFOLDER -r REMOTEGETFILESSCRIPT
+                  [-P PORT] [-T TIMEOUT] [-t] [-d]
+
+Copies selected files (and folders recursively) in Windows Explorer or Nautilus from a folder on a
+remote machine.
 
 options:
-  -h, --help                      Show this help message and exit
-  -u, --username USERNAME         Remote username
-  -H, --hostname HOSTNAME         Remote host's address
-  -p, --password PASSWORD         Remote password
-  -l, --local-folder LOCALFOLDER  Local folder's absolute path
+  -h, --help                  show this help message and exit
+  -u, --username USERNAME     Remote username
+  -H, --hostname HOSTNAME     Remote host's address
+  -p, --password PASSWORD     Remote password
+  -l, --local-folder LOCALFOLDER
+                              Local folder's absolute path
   -r, --remote-get-files-script REMOTEGETFILESSCRIPT
-                                  Remote getSelectedFilesFromExplorerRecurseStdOut.py absolute path
-  -P, --port PORT                 Remote port (default: 22)
-  -T, --timeout TIMEOUT           TCP 3-way handshake timeout in seconds (default: 1)
-  -t, --preserve-times            If set, modification times will be preserved
-  -d, --dont-close                Don't auto-close console window at the end if no error
-                                  occurred. You will have to close it manually or by pressing ENTER
+                              Remote getSelectedFilesFromExplorerRecurseStdOut.py absolute path
+  -P, --port PORT             Remote port (default: 22)
+  -T, --timeout TIMEOUT       TCP 3-way handshake timeout in seconds (default: 5.0)
+  -t, --preserve-times        If set, modification times will be preserved
+  -d, --dont-close            Don't auto-close console window at the end if no error occurred. You
+                              will have to close it manually or by pressing ENTER
 ```
