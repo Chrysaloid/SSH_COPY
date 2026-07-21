@@ -304,7 +304,7 @@ def isFolderCaseSensitiveBase(
 	return (errorOccured, caseSense)
 
 if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
-	ssh, thereWasError = getSSH(
+	ssh, thereWasSSHError = getSSH(
 		username    = username   ,
 		hostnames   = hostname   ,
 		password    = password   ,
@@ -391,6 +391,8 @@ if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 		def isSourceFolderCaseSensitive(path: str): return isFolderCaseSensitiveBase(sourceIsWindows, isRemoteFolderCaseSensitive, (ssh , path ), SOURCE_STR, path)
 		def isDestFolderCaseSensitive  (path: str): return isFolderCaseSensitiveBase(destIsWindows  , isLocalFolderCaseSensitive , (path, False), DEST_STR  , path)
 else: # remoteFolder ACTUALLY refers to a LOCAL folder
+	thereWasSSHError = False
+
 	sourceFolderIter = local_listdir_attr
 	destFolderIter   = local_listdir_attr
 
@@ -980,7 +982,7 @@ if REMOTE_IS_REMOTE:
 if not silent:
 	print(f"\nExecution time: {perf_counter() - start:.3f} s")
 
-if dontClose or thereWasError:
+if dontClose or thereWasSSHError:
 	if silent:
 		input("")
 	else:

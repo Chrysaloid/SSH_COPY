@@ -73,7 +73,7 @@ else:
 selectedFiles = getSelectedFilesFromExplorer() if WINDOWS else getSelectedFilesFromStdIn()
 
 # Main upload process
-ssh, thereWasError = getSSH(
+ssh, thereWasSSHError = getSSH(
 	username  = username,
 	hostnames = hostname,
 	password  = password,
@@ -144,5 +144,5 @@ print(f"Execution time: {time.time() - start:.3f} s")
 if exitStatus:
 	exit(exitStatus)
 
-if dontClose or thereWasError:
+if dontClose or thereWasSSHError:
 	input(clr("\nPress ENTER to continue...", COLOR_OK))

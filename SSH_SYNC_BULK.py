@@ -184,7 +184,7 @@ def main(args: Namespace = None):
 	else:
 		parsedOperations = operations
 
-	ssh, thereWasError = getSSH(
+	ssh, thereWasSSHError = getSSH(
 		username  = username,
 		hostnames = hostname,
 		password  = password,

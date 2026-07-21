@@ -55,7 +55,7 @@ if not os.path.isdir(localFolder):
 else:
 	localFolder = localFolder.replace("\\", "/")
 
-ssh, thereWasError = getSSH(username, hostname, password, timeout, port)
+ssh, thereWasSSHError = getSSH(username, hostname, password, timeout, port)
 
 stdIn, stdOut, stdErr = ssh.exec_command(f'python "{remoteGetFilesScript}"')
 
@@ -99,5 +99,5 @@ print(f"\nSuccessfully got {clr(len(files), COLOR_OK)} file(s)\n")
 sftp.close()
 ssh.close()
 
-if dontClose or thereWasError:
+if dontClose or thereWasSSHError:
 	input(clr("\nPress ENTER to continue...", COLOR_OK))

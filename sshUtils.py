@@ -39,7 +39,7 @@ def getSSH(
 
 	if isinstance(hostnames, str): hostnames = [hostnames]
 
-	thereWasError = False
+	thereWasSSHError = False
 	for hostname in hostnames:
 		errorMessage = None
 		try:
@@ -92,13 +92,13 @@ def getSSH(
 			errorMessage = f"ERROR: Socket error while connecting to {hostname}: {e}"
 
 		if errorMessage:
-			thereWasError = True
+			thereWasSSHError = True
 			cprint(errorMessage, COLOR_ERROR)
 
 	if errorMessage:
 		raise SimpleError("", None)
 
-	return ssh, thereWasError
+	return ssh, thereWasSSHError
 
 def remoteIsWindows(ssh: paramiko.SSHClient) -> bool:
 	try:
