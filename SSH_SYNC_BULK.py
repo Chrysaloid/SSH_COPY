@@ -23,7 +23,7 @@ from .sshUtils import assertRemoteFolderExists, getSSH, remoteIsWindows, RemoteL
 """
 Edge cases that were disregarded:
 - case-insensitivity of file names on Windows - use `fsutil file setCaseSensitiveInfo "C:/path to folder" enable` to enable case-sensitivity for your folder(s)
-- caching of directory listings - while it speeds up the copying process it may result in omitting some files in more complex setups. You can disable it using --cache-directory-listings flag
+- caching of directory listings - while it speeds up the copying process it may result in omitting some files in more complex setups that's why it's disabled by default and you can enable it using --cache-directory-listings flag
 - this script is supposed to be simple so no recursion is performed
 """
 
