@@ -22,9 +22,9 @@ start = perf_counter()
 from .argparseUtils import ArgumentParser_ColoredError, COMMON_FORMATTER_CLASS, IncludeExcludeAction, NameFilter, NoRepeatAction
 from .commonConstants import COLOR_EMPHASIS, COLOR_ERROR, COLOR_OK, COLOR_WARN
 from .fileUtils import assertFolderExists, ensureFolderExists, isDir, isFile, mkdir as localMkdir, modifiedDate
-from .getPlatform import WINDOWS
 from .isFolderCaseSensitive import isFolderCaseSensitive as isLocalFolderCaseSensitive
 from .LocalSFTPAttributes import local_listdir_attr
+from .mySystem import WINDOWS
 from .printRelTime import printRelTime
 from .SimpleError import SimpleError
 from .sshUtils import (

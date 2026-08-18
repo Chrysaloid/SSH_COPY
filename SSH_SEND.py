@@ -13,7 +13,7 @@ start = time.time()
 from .argparseUtils import ArgumentParser_ColoredError, COMMON_FORMATTER_CLASS
 from .commonConstants import COLOR_ERROR, COLOR_ERROR_BACK, COLOR_OK, COLOR_WARN
 from .fileUtils import isDir, isFile, LocalDirEntry
-from .getPlatform import WINDOWS
+from .mySystem import WINDOWS
 from .SimpleError import SimpleError
 from .sshUtils import assertRemoteFolderExists, getSSH, remoteMkdir
 

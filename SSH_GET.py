@@ -9,7 +9,7 @@ from termcolor import colored as clr
 
 from .argparseUtils import ArgumentParser_ColoredError, COMMON_FORMATTER_CLASS
 from .commonConstants import COLOR_OK
-from .getPlatform import WINDOWS
+from .mySystem import WINDOWS
 from .SimpleError import SimpleError
 from .sshUtils import getSSH
 
