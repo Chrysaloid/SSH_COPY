@@ -164,9 +164,12 @@ def remoteMkdir(sftp: _paramiko.SFTPClient, remotePath: str):
 		return False
 
 def ensureRemoteFolderExists(sftp: _paramiko.SFTPClient, remotePath: str):
+	""" Returns True if any part folder was created and False if it already exists """
+	created = False
 	if not remoteFolderExists(sftp, remotePath):
 		for part in _iteratePathParts(remotePath):
-			remoteMkdir(sftp, part)
+			created = remoteMkdir(sftp, part) or created
+	return created
 
 class RemoteListDir:
 	def __init__(self, ssh: _paramiko.SSHClient, pythonStr = "python", init = False):
@@ -239,3 +242,4 @@ if __name__ == "__main__": # Example usage
 		hostnames = "192.168.0.121",
 		password  = None           ,
 	)
+	sftp = ssh.open_sftp()
