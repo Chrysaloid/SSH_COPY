@@ -10,6 +10,35 @@ pip install termcolor paramiko pywin32
 ```
 *\* - Don't install pywin32 on linux.*
 
+## Reusing these modules elsewhere (the `__package__` line)
+
+Several modules here are generally useful outside this project - `SimpleError`, `fileUtils`,
+`sshUtils`, `argparseUtils`, `commonConstants`, `mySystem`, `LocalSFTPAttributes` - and can
+be shared with another library by symlinking them into it. If you do that, **the first line
+of every module matters**:
+
+```python
+from pathlib import Path as _Path; __package__ = __package__ or _Path(__file__).resolve().parent.name
+```
+
+The `__package__ or` part is not decoration. The line exists so that relative imports work
+when a file is run directly, where Python leaves `__package__` empty. It must **never
+overwrite a `__package__` that Python already set**, because `.resolve()` follows a symlink:
+a module imported as `otherLib.sshUtils` through a link would otherwise rename its own
+package to `SSH_COPY`, and its `from .fileUtils import ...` would then load these files a
+**second time** under a second set of module names.
+
+That is not a theoretical cost. Two copies means two of every class, so `isinstance` and
+`issubclass` across the boundary silently answer False. It broke `SimpleError`, whose
+`sys.excepthook` recognises its own class and so printed a full traceback for the other
+copy's identical-looking exceptions. `SimpleError` now also **chains** to the previously
+installed excepthook instead of jumping back to `sys.__excepthook__`, so even a duplicated
+import degrades gracefully.
+
+Symlink targets should be **relative** (`../SSH_COPY/sshUtils.py`), not absolute: git stores
+a symlink's target as the file's content, so an absolute target only resolves on the machine
+that created it.
+
 ## SSH_SEND.py
 Copies selected files (and folders recursively) in Windows Explorer or Nautilus to a folder on a remote machine.
 

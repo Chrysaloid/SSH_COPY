@@ -1,4 +1,4 @@
-from pathlib import Path as _Path; __package__ = _Path(__file__).resolve().parent.name # To be able to use relative imports
+from pathlib import Path as _Path; __package__ = __package__ or _Path(__file__).resolve().parent.name # To be able to use relative imports when run directly - never override a __package__ Python already set (see README)
 
 import socket as _socket
 
