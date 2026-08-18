@@ -72,17 +72,17 @@ def mkdir(path: str):
 	except FileExistsError:
 		return False
 
-def iteratePathParts(path: str):
+def iteratePathParts(path: str, skipRoot = True):
 	path = path.replace("\\", "/").rstrip("/") # TODO: Enhance path normalization and sanitization
-	idx = path.index("/")
-	start = idx + 1
+	start = path.index("/") + (1 if skipRoot else 0)
 	while True:
 		try:
-			idx = path.index("/", start)
-			start = idx + 1
+			idx = path.index("/", start) + 1
+			start = idx
 			yield path[:idx]
 		except:
 			break
+	yield path
 
 def assertFolderExists(path: str, additionalComment = ""):
 	if not _os.path.isdir(path):
@@ -167,3 +167,13 @@ if __name__ == "__main__": # Example usage
 	print(readTextFile(testFile))
 	print(tuple(readLines(testFile)))
 	print(readSplitLines(testFile))
+
+	print(list(iteratePathParts("C:/abc"    )))
+	print(list(iteratePathParts("C:/abc/def")))
+	print(list(iteratePathParts("/abc"      )))
+	print(list(iteratePathParts("/abc/def"  )))
+	print()
+	print(list(iteratePathParts("C:/abc"    , 0)))
+	print(list(iteratePathParts("C:/abc/def", 0)))
+	print(list(iteratePathParts("/abc"      , 0)))
+	print(list(iteratePathParts("/abc/def"  , 0)))
