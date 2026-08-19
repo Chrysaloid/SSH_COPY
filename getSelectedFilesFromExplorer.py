@@ -1,37 +1,37 @@
-from pathlib import Path; __package__ = __package__ or Path(__file__).resolve().parent.name # To be able to use relative imports when run directly - never override a __package__ Python already set (see README)
+from pathlib import Path as _Path; __package__ = __package__ or _Path(__file__).resolve().parent.name # To be able to use relative imports when run directly - never override a __package__ Python already set (see README)
 
-import ctypes
+import ctypes as _ctypes
 
-from termcolor import colored as clr, cprint
-import win32com.client
-import win32gui
+from termcolor import colored as _clr
+from win32com import client as _win32com_client
+import win32gui as _win32gui
 
-from .commonConstants import COLOR_OK
-from .SimpleError import SimpleError
+from .commonConstants import COLOR_OK as _COLOR_OK
+from .SimpleError import SimpleError as _SimpleError
 
-def getTopmostExplorerHwnd() -> int | None:
+def _getTopmostExplorerHwnd() -> int | None:
 	"""Get the HWND of the topmost (most recently active) Explorer window."""
 	topmostHwnd = None
 
 	def enumHandler(hwnd: int, _):
 		nonlocal topmostHwnd
-		if win32gui.IsWindowVisible(hwnd) and win32gui.GetClassName(hwnd) == "CabinetWClass": # class of Explorer windows
+		if _win32gui.IsWindowVisible(hwnd) and _win32gui.GetClassName(hwnd) == "CabinetWClass": # class of Explorer windows
 			topmostHwnd = hwnd
 			return False # Stop at first (topmost) Explorer window
 		return True
 
-	ctypes.windll.kernel32.SetLastError(0) # some modules (i.e. argparse) set LastError and win32gui.EnumWindows doesn't like it
+	_ctypes.windll.kernel32.SetLastError(0) # some modules (i.e. argparse) set LastError and win32gui.EnumWindows doesn't like it
 
-	win32gui.EnumWindows(enumHandler, None)
+	_win32gui.EnumWindows(enumHandler, None)
 
 	return topmostHwnd
 
 def getSelectedFilesFromExplorer(infoAndError=True, forwardSlashes=True) -> list[str]:
-	targetHwnd = getTopmostExplorerHwnd()
+	targetHwnd = _getTopmostExplorerHwnd()
 
 	selectedFiles = []
 	if targetHwnd is not None:
-		shell = win32com.client.Dispatch("Shell.Application")
+		shell = _win32com_client.Dispatch("Shell.Application")
 
 		for window in shell.Windows():
 			try:
@@ -46,8 +46,13 @@ def getSelectedFilesFromExplorer(infoAndError=True, forwardSlashes=True) -> list
 
 	if infoAndError:
 		if not selectedFiles:
-			raise SimpleError("No files/folders selected")
+			raise _SimpleError("No files/folders selected")
 		else:
-			print(f"{clr(len(selectedFiles), COLOR_OK)} file(s)/folder(s) selected")
+			print(f"{_clr(len(selectedFiles), _COLOR_OK)} file(s)/folder(s) selected")
 
 	return selectedFiles
+
+if __name__ == "__main__": # Example usage
+	from myLibs.getSelectedFilesFromExplorer import getSelectedFilesFromExplorer
+
+	print(getSelectedFilesFromExplorer(False))

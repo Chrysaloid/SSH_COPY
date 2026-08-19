@@ -1,98 +1,98 @@
-import sys
+import sys as _sys
 
-if sys.platform == "win32": # Only load on Windows
-	import ctypes
-	from ctypes import wintypes
+if _sys.platform == "win32": # Only load on Windows
+	import ctypes as _ctypes
+	from ctypes import wintypes as _wintypes
 
 	# --- Constants ---
-	FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
-	INVALID_HANDLE_VALUE = wintypes.HANDLE(-1).value
+	_FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
+	_INVALID_HANDLE_VALUE = _wintypes.HANDLE(-1).value
 
 	# NTSTATUS codes (subset)
-	STATUS_SUCCESS = 0x00000000
-	STATUS_NOT_IMPLEMENTED = 0xC0000002
-	STATUS_INVALID_INFO_CLASS = 0xC0000003
-	STATUS_INVALID_PARAMETER = 0xC000000D
-	STATUS_NOT_SUPPORTED = 0xC00000BB
-	STATUS_DIRECTORY_NOT_EMPTY = 0xC0000101
+	_STATUS_SUCCESS = 0x00000000
+	_STATUS_NOT_IMPLEMENTED = 0xC0000002
+	_STATUS_INVALID_INFO_CLASS = 0xC0000003
+	_STATUS_INVALID_PARAMETER = 0xC000000D
+	_STATUS_NOT_SUPPORTED = 0xC00000BB
+	_STATUS_DIRECTORY_NOT_EMPTY = 0xC0000101
 
 	# FILE_INFORMATION_CLASS
-	FileCaseSensitiveInformation = 71
+	_FileCaseSensitiveInformation = 71
 
 	# Flags
-	CASE_SENSITIVE_DIR = 0x00000001
+	_CASE_SENSITIVE_DIR = 0x00000001
 
 	# --- Structs ---
-	class IO_STATUS_BLOCK(ctypes.Structure):
+	class _IO_STATUS_BLOCK(_ctypes.Structure):
 		_fields_ = [
-			("Status", wintypes.ULONG),
-			("Information", wintypes.ULONG),
+			("Status", _wintypes.ULONG),
+			("Information", _wintypes.ULONG),
 		]
 
-	class FILE_CASE_SENSITIVE_INFORMATION(ctypes.Structure):
+	class _FILE_CASE_SENSITIVE_INFORMATION(_ctypes.Structure):
 		_fields_ = [
-			("Flags", wintypes.ULONG),
+			("Flags", _wintypes.ULONG),
 		]
 
 	# --- DLLs ---
-	kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-	ntdll = ctypes.WinDLL("ntdll", use_last_error=True)
+	_kernel32 = _ctypes.WinDLL("kernel32", use_last_error=True)
+	_ntdll = _ctypes.WinDLL("ntdll", use_last_error=True)
 
 	# --- Function prototypes ---
-	CreateFileW = kernel32.CreateFileW
-	CreateFileW.argtypes = [
-		wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
-		wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE
+	_CreateFileW = _kernel32.CreateFileW
+	_CreateFileW.argtypes = [
+		_wintypes.LPCWSTR, _wintypes.DWORD, _wintypes.DWORD,
+		_wintypes.LPVOID, _wintypes.DWORD, _wintypes.DWORD, _wintypes.HANDLE
 	]
-	CreateFileW.restype = wintypes.HANDLE
+	_CreateFileW.restype = _wintypes.HANDLE
 
-	CloseHandle = kernel32.CloseHandle
-	CloseHandle.argtypes = [wintypes.HANDLE]
-	CloseHandle.restype = wintypes.BOOL
+	_CloseHandle = _kernel32.CloseHandle
+	_CloseHandle.argtypes = [_wintypes.HANDLE]
+	_CloseHandle.restype = _wintypes.BOOL
 
-	NtQueryInformationFile = ntdll.NtQueryInformationFile
-	NtQueryInformationFile.argtypes = [
-		wintypes.HANDLE,
-		ctypes.POINTER(IO_STATUS_BLOCK),
-		ctypes.POINTER(FILE_CASE_SENSITIVE_INFORMATION),
-		wintypes.ULONG,
-		wintypes.INT
+	_NtQueryInformationFile = _ntdll.NtQueryInformationFile
+	_NtQueryInformationFile.argtypes = [
+		_wintypes.HANDLE,
+		_ctypes.POINTER(_IO_STATUS_BLOCK),
+		_ctypes.POINTER(_FILE_CASE_SENSITIVE_INFORMATION),
+		_wintypes.ULONG,
+		_wintypes.INT
 	]
-	NtQueryInformationFile.restype = wintypes.ULONG
+	_NtQueryInformationFile.restype = _wintypes.ULONG
 
 	def isFolderCaseSensitive(path: str, throw_on_error: bool = True) -> bool:
-		handle = CreateFileW(
-			path,
+		handle = _CreateFileW(
+			str(path),
 			0,  # no read access needed
 			3,  # FILE_SHARE_READ | FILE_SHARE_WRITE
 			None,
 			3,  # OPEN_EXISTING
-			FILE_FLAG_BACKUP_SEMANTICS,
+			_FILE_FLAG_BACKUP_SEMANTICS,
 			None
 		)
 
-		if handle == INVALID_HANDLE_VALUE:
-			raise ctypes.WinError(ctypes.get_last_error())
+		if handle == _INVALID_HANDLE_VALUE:
+			raise _ctypes.WinError(_ctypes.get_last_error())
 
 		try:
-			iosb = IO_STATUS_BLOCK()
-			case_info = FILE_CASE_SENSITIVE_INFORMATION()
+			iosb = _IO_STATUS_BLOCK()
+			case_info = _FILE_CASE_SENSITIVE_INFORMATION()
 
-			status = NtQueryInformationFile(
+			status = _NtQueryInformationFile(
 				handle,
-				ctypes.byref(iosb),
-				ctypes.byref(case_info),
-				ctypes.sizeof(case_info),
-				FileCaseSensitiveInformation
+				_ctypes.byref(iosb),
+				_ctypes.byref(case_info),
+				_ctypes.sizeof(case_info),
+				_FileCaseSensitiveInformation
 			)
 
-			if status == STATUS_SUCCESS:
-				return bool(case_info.Flags & CASE_SENSITIVE_DIR)
+			if status == _STATUS_SUCCESS:
+				return bool(case_info.Flags & _CASE_SENSITIVE_DIR)
 			elif status in (
-				STATUS_NOT_IMPLEMENTED,
-				STATUS_INVALID_INFO_CLASS,
-				STATUS_INVALID_PARAMETER,
-				STATUS_NOT_SUPPORTED,
+				_STATUS_NOT_IMPLEMENTED,
+				_STATUS_INVALID_INFO_CLASS,
+				_STATUS_INVALID_PARAMETER,
+				_STATUS_NOT_SUPPORTED,
 			):
 				if throw_on_error:
 					raise RuntimeError("Case sensitivity not supported on this Windows version.")
@@ -100,7 +100,13 @@ if sys.platform == "win32": # Only load on Windows
 			else:
 				raise RuntimeError(f"Unexpected NTSTATUS: 0x{status:08X}")
 		finally:
-			CloseHandle(handle)
+			_CloseHandle(handle)
 else:
 	def isFolderCaseSensitive(destFolderParam: str) -> bool:
 		raise NotImplementedError("Case sensitivity check only works on Windows")
+
+if __name__ == "__main__": # Example usage
+	from pathlib import Path as _Path
+
+	from myLibs.isFolderCaseSensitive import isFolderCaseSensitive
+	print(isFolderCaseSensitive(_Path(__file__).resolve().parent))

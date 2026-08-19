@@ -1,8 +1,8 @@
-import os
+import os as _os
 
 class LocalSFTPAttributes:
 	"""Mimics paramiko.sftp_attr.SFTPAttributes for local files"""
-	def __init__(self, entry: os.DirEntry):
+	def __init__(self, entry: _os.DirEntry):
 		info = entry.stat(follow_symlinks=False)
 		self.filename = entry.name
 		self.st_mode  = info.st_mode
@@ -43,7 +43,7 @@ def local_listdir_attr(path: str):
 	Returns a list of LocalSFTPAttributes by default
 	"""
 	entries = []
-	with os.scandir(path) as it:
+	with _os.scandir(path) as it:
 		for entry in it:
 			entries.append(LocalSFTPAttributes(entry))
 	return entries
@@ -52,6 +52,6 @@ def local_listdir_attr_gen(path: str):
 	"""
 	Generator equivalent of local_listdir_attr
 	"""
-	with os.scandir(path) as it:
+	with _os.scandir(path) as it:
 		for entry in it:
 			yield LocalSFTPAttributes(entry)
