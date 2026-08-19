@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime as _datetime, timezone as _timezone
 
 second =          1.0
 minute = second *  60
@@ -8,7 +8,7 @@ month  = day    *  30
 year   = day    * 365
 week   = day    *   7
 
-timeNamesDict: dict[str, tuple[str, tuple[tuple[str]]]] = {
+_timeNamesDict: dict[str, tuple[str, tuple[tuple[str]]]] = {
 	"pol": (
 		" temu",
 		(
@@ -28,9 +28,9 @@ timeNamesDict: dict[str, tuple[str, tuple[tuple[str]]]] = {
 }
 
 def toFixed(num, dec = "0"):
-	return format(num, "." + dec + "f")
+	return format(num, f".{dec}f")
 
-def printRelTime(
+def getRelTime(
 	epoch_s   : float = 0    ,
 	czyDiff   : bool  = True ,
 	lang      : str   = "ang",
@@ -40,14 +40,14 @@ def printRelTime(
 	leftAlign : bool  = False,
 	prec      : str   = None ,
 ):
-	czas = (datetime.now(timezone.utc).timestamp() - epoch_s) if czyDiff else epoch_s
+	czas = (_datetime.now(_timezone.utc).timestamp() - epoch_s) if czyDiff else epoch_s
 	znak = "-" if czas < 0 else ""
 	czas = abs(czas)
 	prec0 = "0" if prec is None else prec
 	prec1 = "1" if prec is None else prec
 
 	try:
-		agoStr, timeNamesArr = timeNamesDict[lang]
+		agoStr, timeNamesArr = _timeNamesDict[lang]
 		timeNames = timeNamesArr[compact]
 	except:
 		raise Exception("Language not supported")
@@ -64,3 +64,11 @@ def printRelTime(
 	else					: czytCzas = (toFixed(czas / year  , prec1) if czas <= year   * 9.95 else toFixed(czas / year  , prec0)) + space + timeNames[5]
 
 	return znak + czytCzas + (agoStr if ago else "")
+
+if __name__ == "__main__": # Example usage
+	from myLibs.printRelTime import getRelTime
+
+	# from myLibs.printRelTime import day, getRelTime, hour, minute, month, second, week, year
+
+	print(getRelTime())
+	print(getRelTime(1000000000))

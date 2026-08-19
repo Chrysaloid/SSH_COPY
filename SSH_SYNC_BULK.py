@@ -16,7 +16,7 @@ from termcolor import colored as clr, cprint
 from .argparseUtils import ArgumentParser_ColoredError, COMMON_FORMATTER_CLASS
 from .fileUtils import assertFolderExists as assertLocalFolderExists, isDir, isFile
 from .LocalSFTPAttributes import local_listdir_attr, LocalSFTPAttributes
-from .printRelTime import printRelTime
+from .printRelTime import getRelTime
 from .SimpleError import SimpleError
 from .sshUtils import assertRemoteFolderExists, getSSH, remoteIsWindows, RemoteListDir
 
@@ -291,7 +291,7 @@ def main(args: Namespace = None):
 			print(f"""# Newest common date: {
 				datetime.fromtimestamp(newestCommonDate)
 				.strftime('%Y-%m-%d %H:%M:%S - {rel}')
-				.format(rel = printRelTime(newestCommonDate)) if newestCommonDate else clr("None because there are no common files", "yellow")
+				.format(rel = getRelTime(newestCommonDate)) if newestCommonDate else clr("None because there are no common files", "yellow")
 			}""")
 
 		for filename in sourceFiles.keys() | destFiles.keys(): # all keys

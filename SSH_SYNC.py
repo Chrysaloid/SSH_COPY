@@ -25,7 +25,7 @@ from .fileUtils import assertFolderExists, ensureFolderExists, isDir, isFile, mk
 from .isFolderCaseSensitive import isFolderCaseSensitive as isLocalFolderCaseSensitive
 from .LocalSFTPAttributes import local_listdir_attr
 from .mySystem import WINDOWS
-from .printRelTime import printRelTime
+from .printRelTime import getRelTime
 from .SimpleError import SimpleError
 from .sshUtils import (
 	assertRemoteFolderExists,
@@ -910,7 +910,7 @@ def recursiveCopy(
 
 			if printCommonDate and not silent:
 				print(f".{sourceFolderParam.replace(NNS.sourceFolderBase, "", 1) or "/"}: Newest common date: { \
-					datetime.fromtimestamp(newestCommonDate).strftime(printCommonDate).format(rel = printRelTime(newestCommonDate))}")
+					datetime.fromtimestamp(newestCommonDate).strftime(printCommonDate).format(rel = getRelTime(newestCommonDate))}")
 
 			for sourceEntry, destEntry, name in allEntries:
 				# When sourceEntry is None sourceEntryBase might not be None (because i.e. folders where
