@@ -392,7 +392,9 @@ Optional arguments:
   -d, --dry-run               Do not perform any copying and just print the information that would
                               normally be printed. Good for testing
   -O, --remote-os REMOTEOS    Remote host's operating system. Can be (a, auto, auto-detect) or (w,
-                              win, windows) or (u, unix, l, linux, p, posix, m, macos). Windows just
+                              win, windows) or (u, unix, l, linux, p, posix) or (m, mac, macos,
+                              darwin) or (t, termux) or (n, android) or (b, bsd, freebsd, openbsd,
+                              netbsd, dragonfly) or (s, solaris, sunos, illumos). Windows just
                               needs to be handled in a special way so we need to differentiate it
                               from the others. Auto will run a few commands on the remote machine to
                               determine it's OS and they are not 100% relaible so if you know the

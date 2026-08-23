@@ -30,7 +30,10 @@ class OS(IntEnum):
 	WINDOWS = auto(1)
 	LINUX   = auto()
 	TERMUX  = auto()
+	ANDROID = auto() # Android without Termux (paths are not rooted in /data/data/com.termux/files)
 	MAC     = auto()
+	BSD     = auto() # FreeBSD, OpenBSD, NetBSD, DragonFly
+	SOLARIS = auto() # Solaris, illumos, OpenIndiana
 	UNKNOWN = auto()
 
 def getSSH(
@@ -108,35 +111,47 @@ def getSSH(
 
 	return ssh, thereWasSSHError
 
+def _remoteOutput(ssh: _paramiko.SSHClient, command: str) -> str:
+	""" Runs a command remotely and returns its stripped, lowercased stdout ("" if anything went wrong) """
+	try:
+		stdin, stdout, stderr = ssh.exec_command(command)
+		return stdout.read().decode(errors="ignore").strip().lower()
+	except Exception:
+		return ""
+
 def detect_remote_os(ssh: _paramiko.SSHClient) -> OS:
 	try:
 		banner = ssh.get_transport().remote_version.lower()
-		if "windows" in banner:
+		if "windows" in banner: # Win32-OpenSSH announces itself as "OpenSSH_for_Windows_<version>"
 			return OS.WINDOWS
 	except Exception:
 		pass
 
-	try:
-		stdin, stdout, stderr = ssh.exec_command("uname -s")
-		out = stdout.read().decode(errors="ignore").strip().lower()
-		if out:
-			if out.startswith(("linux", "darwin", "freebsd", "netbsd", "openbsd")):
-				return OS.LINUX
-			if out.startswith(("msys_nt", "cygwin_nt", "mingw")):
-				return OS.WINDOWS
-			# Unexpected uname string -> treat as non-Windows
+	kernel = _remoteOutput(ssh, "uname -s")
+	if kernel:
+		if kernel.startswith("darwin"):
+			return OS.MAC
+		if kernel.startswith(("msys_nt", "cygwin_nt", "mingw")): # A POSIX layer running on top of Windows
+			return OS.WINDOWS
+		if kernel.endswith("bsd") or kernel.startswith("dragonfly"):
+			return OS.BSD
+		if kernel.startswith("sunos"):
+			return OS.SOLARIS
+		if kernel.startswith("linux"):
+			# Android's kernel name is "Linux" too, so it has to be told apart by other means:
+			# "uname -o" prints "Android" (instead of "GNU/Linux"), Termux exports $PREFIX
+			# (/data/data/com.termux/files/usr) and $TERMUX_VERSION and every Android exports $ANDROID_ROOT
+			flavour = _remoteOutput(ssh, 'echo "$(uname -o 2>/dev/null) $PREFIX$TERMUX_VERSION $ANDROID_ROOT$ANDROID_DATA"')
+			if "termux" in flavour:
+				return OS.TERMUX
+			if "android" in flavour:
+				return OS.ANDROID
 			return OS.LINUX
-	except Exception:
-		pass
+		return OS.LINUX # Unexpected uname string -> treat as some other POSIX system
 
-	# Fallback: try cmd.exe (may also work in WSL, so only used if uname absent)
-	try:
-		stdin, stdout, stderr = ssh.exec_command("cmd.exe /c echo %OS%")
-		out = stdout.read().decode(errors="ignore").strip().lower()
-		if out.startswith("windows"):
-			return OS.WINDOWS
-	except Exception:
-		pass
+	# Fallback: try cmd.exe (may also work in WSL, so only used if uname is absent)
+	if _remoteOutput(ssh, "cmd.exe /c echo %OS%").startswith("windows"):
+		return OS.WINDOWS
 
 	raise _SimpleError(f"Could not determine remote OS due to errors") # Should not happen?
 
@@ -266,13 +281,16 @@ if __name__ == "__main__": # Example usage
 	print(OS.WINDOWS)
 	print(OS.LINUX)
 
-def parse_os_str(os_str: str | OS, ssh: _paramiko.SSHClient):
+def parse_os_str(os_str: str | OS, ssh: _paramiko.SSHClient) -> OS:
 	""" Parse (or detect remote) OS """
-	if issubclass(os_str, OS): return os_str
+	if isinstance(os_str, OS): return os_str # an OS member is an instance, not a class - issubclass would raise
 	match os_str.lower().strip():
-		case "w" | "win" | "windows"                     : return OS.WINDOWS
-		case "u" | "unix" | "l" | "linux" | "p" | "posix": return OS.LINUX
-		case "m" | "mac" | "macos"                       : return OS.MAC
-		case "t" | "termux" | "android"                  : return OS.TERMUX
-		case "a" | "auto" | "auto-detect"                : return detect_remote_os(ssh) if ssh else OS.UNKNOWN
+		case "w" | "win" | "windows"                                     : return OS.WINDOWS
+		case "u" | "unix" | "l" | "linux" | "p" | "posix"                : return OS.LINUX
+		case "m" | "mac" | "macos" | "darwin"                            : return OS.MAC
+		case "t" | "termux"                                              : return OS.TERMUX
+		case "n" | "android"                                             : return OS.ANDROID
+		case "b" | "bsd" | "freebsd" | "openbsd" | "netbsd" | "dragonfly": return OS.BSD
+		case "s" | "solaris" | "sunos" | "illumos"                       : return OS.SOLARIS
+		case "a" | "auto" | "auto-detect"                                : return detect_remote_os(ssh) if ssh else OS.UNKNOWN
 		case _: raise _SimpleError(f"Invalid OS: {os_str}")
