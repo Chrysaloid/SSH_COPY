@@ -18,7 +18,7 @@ from .fileUtils import assertFolderExists as assertLocalFolderExists, isDir, isF
 from .LocalSFTPAttributes import local_listdir_attr, LocalSFTPAttributes
 from .printRelTime import getRelTime
 from .SimpleError import SimpleError
-from .sshUtils import assertRemoteFolderExists, getSSH, OS, parse_os_str, remoteIsWindows, RemoteListDir
+from .sshUtils import assertRemoteFolderExists, getSSH, OS, parse_os_str, RemoteListDir
 
 """
 Edge cases that were disregarded:

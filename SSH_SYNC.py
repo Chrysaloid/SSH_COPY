@@ -29,11 +29,12 @@ from .printRelTime import getRelTime
 from .SimpleError import SimpleError
 from .sshUtils import (
 	assertRemoteFolderExists,
+	detect_remote_os,
 	ensureRemoteFolderExists,
 	getSSH,
 	isFolderCaseSensitive as isRemoteFolderCaseSensitive,
+	OS,
 	remoteHasPython,
-	remoteIsWindows,
 	RemoteListDir,
 	remoteMkdir as remoteMkdirBase
 )
@@ -358,7 +359,7 @@ if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 		destRmdir = sftp.rmdir
 
 		sourceIsWindows = WINDOWS
-		destIsWindows = remoteIsWindows(ssh)
+		destIsWindows = detect_remote_os(ssh) == OS.WINDOWS
 
 		# Only for Windows
 		def isSourceFolderCaseSensitive(path: str): return isFolderCaseSensitiveBase(sourceIsWindows, isLocalFolderCaseSensitive , (path, False), SOURCE_STR, path)
@@ -385,7 +386,7 @@ if REMOTE_IS_REMOTE: # remoteFolder REALLY refers to a REMOTE folder
 		sourceRmdir = sftp.rmdir
 		destRmdir = os.rmdir
 
-		sourceIsWindows = remoteIsWindows(ssh)
+		sourceIsWindows = detect_remote_os(ssh) == OS.WINDOWS
 		destIsWindows = WINDOWS
 
 		def isSourceFolderCaseSensitive(path: str): return isFolderCaseSensitiveBase(sourceIsWindows, isRemoteFolderCaseSensitive, (ssh , path ), SOURCE_STR, path)

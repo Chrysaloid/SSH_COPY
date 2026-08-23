@@ -108,11 +108,11 @@ def getSSH(
 
 	return ssh, thereWasSSHError
 
-def remoteIsWindows(ssh: _paramiko.SSHClient) -> bool:
+def detect_remote_os(ssh: _paramiko.SSHClient) -> OS:
 	try:
 		banner = ssh.get_transport().remote_version.lower()
 		if "windows" in banner:
-			return True
+			return OS.WINDOWS
 	except Exception:
 		pass
 
@@ -121,11 +121,11 @@ def remoteIsWindows(ssh: _paramiko.SSHClient) -> bool:
 		out = stdout.read().decode(errors="ignore").strip().lower()
 		if out:
 			if out.startswith(("linux", "darwin", "freebsd", "netbsd", "openbsd")):
-				return False
+				return OS.LINUX
 			if out.startswith(("msys_nt", "cygwin_nt", "mingw")):
-				return True
+				return OS.WINDOWS
 			# Unexpected uname string -> treat as non-Windows
-			return False
+			return OS.LINUX
 	except Exception:
 		pass
 
@@ -134,11 +134,11 @@ def remoteIsWindows(ssh: _paramiko.SSHClient) -> bool:
 		stdin, stdout, stderr = ssh.exec_command("cmd.exe /c echo %OS%")
 		out = stdout.read().decode(errors="ignore").strip().lower()
 		if out.startswith("windows"):
-			return True
+			return OS.WINDOWS
 	except Exception:
 		pass
 
-	raise _SimpleError(f"Could not determine if remote is Windows due to errors") # Should not happen?
+	raise _SimpleError(f"Could not determine remote OS due to errors") # Should not happen?
 
 def isFolderCaseSensitive(ssh: _paramiko.SSHClient, pathToFolder: str) -> bool:
 	stdin, stdout, stderr = ssh.exec_command(f'C:/Windows/System32/fsutil.exe file queryCaseSensitiveInfo "{pathToFolder}" 2>&1')
@@ -267,11 +267,12 @@ if __name__ == "__main__": # Example usage
 	print(OS.LINUX)
 
 def parse_os_str(os_str: str | OS, ssh: _paramiko.SSHClient):
+	""" Parse (or detect remote) OS """
 	if issubclass(os_str, OS): return os_str
 	match os_str.lower().strip():
 		case "w" | "win" | "windows"                     : return OS.WINDOWS
 		case "u" | "unix" | "l" | "linux" | "p" | "posix": return OS.LINUX
 		case "m" | "mac" | "macos"                       : return OS.MAC
 		case "t" | "termux" | "android"                  : return OS.TERMUX
-		case "a" | "auto" | "auto-detect"                : return remoteIsWindows(ssh) if ssh else OS.UNKNOWN
+		case "a" | "auto" | "auto-detect"                : return detect_remote_os(ssh) if ssh else OS.UNKNOWN
 		case _: raise _SimpleError(f"Invalid OS: {os_str}")
