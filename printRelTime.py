@@ -31,15 +31,16 @@ def toFixed(num, dec = "0"):
 	return format(num, f".{dec}f")
 
 def getRelTime(
-	epoch_s   : float = 0    ,
-	czyDiff   : bool  = True ,
-	lang      : str   = "ang",
-	compact   : int   = 0    ,
-	space     : str   = " "  ,
-	ago       : bool  = True ,
-	leftAlign : bool  = False,
-	prec      : str   = None ,
+	epoch_s   : float | _datetime = 0    ,
+	czyDiff   : bool              = True ,
+	lang      : str               = "ang",
+	compact   : int               = 0    ,
+	space     : str               = " "  ,
+	ago       : bool              = True ,
+	leftAlign : bool              = False,
+	prec      : str               = None ,
 ):
+	epoch_s = epoch_s.timestamp() if isinstance(epoch_s, _datetime) else epoch_s
 	czas = (_datetime.now(_timezone.utc).timestamp() - epoch_s) if czyDiff else epoch_s
 	znak = "-" if czas < 0 else ""
 	czas = abs(czas)
