@@ -32,8 +32,6 @@ class OS(IntEnum):
 	TERMUX  = auto()
 	ANDROID = auto() # Android without Termux (paths are not rooted in /data/data/com.termux/files)
 	MAC     = auto()
-	BSD     = auto() # FreeBSD, OpenBSD, NetBSD, DragonFly
-	SOLARIS = auto() # Solaris, illumos, OpenIndiana
 	UNKNOWN = auto()
 
 def getSSH(
@@ -111,7 +109,7 @@ def getSSH(
 
 	return ssh, thereWasSSHError
 
-def _remoteOutput(ssh: _paramiko.SSHClient, command: str) -> str:
+def get_output_of_remote_command(ssh: _paramiko.SSHClient, command: str) -> str:
 	""" Runs a command remotely and returns its stripped, lowercased stdout ("" if anything went wrong) """
 	try:
 		stdin, stdout, stderr = ssh.exec_command(command)
@@ -127,30 +125,28 @@ def detect_remote_os(ssh: _paramiko.SSHClient) -> OS:
 	except Exception:
 		pass
 
-	kernel = _remoteOutput(ssh, "uname -s")
+	kernel = get_output_of_remote_command(ssh, "uname -s")
 	if kernel:
 		if kernel.startswith("darwin"):
 			return OS.MAC
 		if kernel.startswith(("msys_nt", "cygwin_nt", "mingw")): # A POSIX layer running on top of Windows
 			return OS.WINDOWS
-		if kernel.endswith("bsd") or kernel.startswith("dragonfly"):
-			return OS.BSD
-		if kernel.startswith("sunos"):
-			return OS.SOLARIS
 		if kernel.startswith("linux"):
 			# Android's kernel name is "Linux" too, so it has to be told apart by other means:
 			# "uname -o" prints "Android" (instead of "GNU/Linux"), Termux exports $PREFIX
 			# (/data/data/com.termux/files/usr) and $TERMUX_VERSION and every Android exports $ANDROID_ROOT
-			flavour = _remoteOutput(ssh, 'echo "$(uname -o 2>/dev/null) $PREFIX$TERMUX_VERSION $ANDROID_ROOT$ANDROID_DATA"')
+			flavour = get_output_of_remote_command(ssh, 'echo "$(uname -o 2>/dev/null) $PREFIX$TERMUX_VERSION $ANDROID_ROOT$ANDROID_DATA"')
 			if "termux" in flavour:
 				return OS.TERMUX
 			if "android" in flavour:
 				return OS.ANDROID
+
 			return OS.LINUX
+
 		return OS.LINUX # Unexpected uname string -> treat as some other POSIX system
 
 	# Fallback: try cmd.exe (may also work in WSL, so only used if uname is absent)
-	if _remoteOutput(ssh, "cmd.exe /c echo %OS%").startswith("windows"):
+	if get_output_of_remote_command(ssh, "cmd.exe /c echo %OS%").startswith("windows"):
 		return OS.WINDOWS
 
 	raise _SimpleError(f"Could not determine remote OS due to errors") # Should not happen?
