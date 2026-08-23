@@ -21,7 +21,7 @@ from paramiko.ssh_exception import (
 from termcolor import colored as _clr, cprint as _cprint
 
 from .commonConstants import COLOR_ERROR as _COLOR_ERROR
-from .fileUtils import isDir as _isDir, iteratePathParts as _iteratePathParts
+from .fileUtils import isDir as _isDir, isFile as _isFile, iteratePathParts as _iteratePathParts
 from .LocalSFTPAttributes import LocalSFTPAttributes as _LocalSFTPAttributes
 from .SimpleError import SimpleError as _SimpleError
 
@@ -143,6 +143,13 @@ def isFolderCaseSensitive(ssh: _paramiko.SSHClient, pathToFolder: str) -> bool:
 		return False
 
 	raise RuntimeError(f"Unexpected fsutil output:\n{output}")
+
+def remoteFileExists(sftp: _paramiko.SFTPClient, remotePath: str) -> bool:
+	try:
+		fileInfo = sftp.stat(remotePath) # Raises FileNotFoundError if it doesn't exist
+		return _isFile(fileInfo)
+	except FileNotFoundError:
+		return False
 
 def remoteFolderExists(sftp: _paramiko.SFTPClient, remotePath: str) -> bool:
 	try:
