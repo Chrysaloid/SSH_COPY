@@ -1,5 +1,6 @@
 from pathlib import Path as _Path; __package__ = __package__ or _Path(__file__).resolve().parent.name # To be able to use relative imports when run directly - never override a __package__ Python already set (see README)
 
+from enum import auto, IntEnum
 import socket as _socket
 
 import paramiko as _paramiko
@@ -24,6 +25,13 @@ from .commonConstants import COLOR_ERROR as _COLOR_ERROR
 from .fileUtils import isDir as _isDir, isFile as _isFile, iteratePathParts as _iteratePathParts
 from .LocalSFTPAttributes import LocalSFTPAttributes as _LocalSFTPAttributes
 from .SimpleError import SimpleError as _SimpleError
+
+class OS(IntEnum):
+	WINDOWS = auto(1)
+	LINUX   = auto()
+	TERMUX  = auto()
+	MAC     = auto()
+	UNKNOWN = auto()
 
 def getSSH(
 	username: str,
@@ -250,3 +258,20 @@ if __name__ == "__main__": # Example usage
 		password  = None           ,
 	)
 	sftp = ssh.open_sftp()
+
+	print(remoteFolderExists(sftp, "G:/temp"))
+	print(remoteFolderExists(sftp, "G:/temp/"))
+	print()
+
+	print(OS.WINDOWS)
+	print(OS.LINUX)
+
+def parse_os_str(os_str: str | OS, ssh: _paramiko.SSHClient):
+	if issubclass(os_str, OS): return os_str
+	match os_str.lower().strip():
+		case "w" | "win" | "windows"                     : return OS.WINDOWS
+		case "u" | "unix" | "l" | "linux" | "p" | "posix": return OS.LINUX
+		case "m" | "mac" | "macos"                       : return OS.MAC
+		case "t" | "termux" | "android"                  : return OS.TERMUX
+		case "a" | "auto" | "auto-detect"                : return remoteIsWindows(ssh) if ssh else OS.UNKNOWN
+		case _: raise _SimpleError(f"Invalid OS: {os_str}")

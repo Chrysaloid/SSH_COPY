@@ -18,7 +18,7 @@ from .fileUtils import assertFolderExists as assertLocalFolderExists, isDir, isF
 from .LocalSFTPAttributes import local_listdir_attr, LocalSFTPAttributes
 from .printRelTime import getRelTime
 from .SimpleError import SimpleError
-from .sshUtils import assertRemoteFolderExists, getSSH, remoteIsWindows, RemoteListDir
+from .sshUtils import assertRemoteFolderExists, getSSH, OS, parse_os_str, remoteIsWindows, RemoteListDir
 
 """
 Edge cases that were disregarded:
@@ -194,11 +194,7 @@ def main(args: Namespace = None):
 	)
 	sftp = ssh.open_sftp()
 
-	match remoteOs.lower().strip():
-		case "w" | "win" | "windows": REMOTE_IS_WINDOWS = True
-		case "u" | "unix" | "l" | "linux" | "p" | "posix" | "m" | "macos": REMOTE_IS_WINDOWS = False
-		case "a" | "auto" | "auto-detect": REMOTE_IS_WINDOWS = remoteIsWindows(ssh)
-		case _: raise SimpleError(f"Invalid OS: {remoteOs}")
+	REMOTE_IS_WINDOWS = parse_os_str(remoteOs, ssh) == OS.WINDOWS
 
 	if verbose: print(f"Remote OS is {"Windows" if REMOTE_IS_WINDOWS else "not Windows"}")
 
