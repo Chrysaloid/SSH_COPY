@@ -12,6 +12,18 @@ WINDOWS_RESERVED_NAMES = set("con, prn, aux, nul, com1, com2, com3, com4, com5, 
 INVALID_FILENAME_CHARS = _re.compile(r'[<>:"/\|?*\x00-\x1F]')
 FILENAME_EXT_SPLIT = _re.compile(r"^(.*?)(\.\w*?)$")
 
+def read(path: str | _Path, encoding="UTF-8"):
+	""" Read file as UTF-8 text """
+	return open(path, "rt", encoding=encoding)
+
+def write(path: str | _Path, encoding="UTF-8"):
+	""" Write file as UTF-8 text """
+	return open(path, "wt", encoding=encoding)
+
+def append(path: str | _Path, encoding="UTF-8"):
+	""" Append UTF-8 text to file """
+	return open(path, "at", encoding=encoding)
+
 def sanitizeFilename(name: str):
 	name = name.strip().rstrip(".")
 
@@ -126,16 +138,25 @@ def readTextFile(path: str | _Path, encoding="UTF-8"):
 	with open(path, "rt", encoding=encoding) as f:
 		return f.read()
 
-def readSplitLines(path: str | _Path, encoding="UTF-8"):
+def readLines(path: str | _Path, keep_empty_lines=False, keep_line_endings=False, encoding="UTF-8"):
 	with open(path, "rt", encoding=encoding) as f:
-		return f.read().splitlines()
-
-def readLines(path: str | _Path, encoding="UTF-8"):
-	with open(path, "rt", encoding=encoding) as f:
-		for line in f:
-			line = line.rstrip()
-			if line:
-				yield line
+		if keep_empty_lines:
+			if keep_line_endings:
+				for line in f:
+					yield line
+			else:
+				for line in f:
+					yield line.rstrip()
+		else:
+			if keep_line_endings: # this is probably useless
+				for line in f:
+					if line:
+						yield line
+			else: # default
+				for line in f:
+					line = line.rstrip()
+					if line:
+						yield line
 
 def writeTextFile(path: str | _Path, text: str, append=False, encoding="UTF-8"):
 	with open(path, "at" if append else "wt", encoding=encoding) as f:
@@ -146,7 +167,7 @@ def writeLines(path: str | _Path, lines: list[str], append=False, encoding="UTF-
 		return f.write("\n".join(lines)) + f.write("\n")
 
 def globOneFile(globPattern: str):
-	return next(_glob.iglob(globPattern), None).replace("\\","/")
+	return next(_glob.iglob(str(globPattern)), None).replace("\\","/")
 
 class LocalDirEntry:
 	def __init__(self, absPath: str):
@@ -169,6 +190,7 @@ if __name__ == "__main__": # Example usage
 	print(readTextFile(testFile))
 	print(tuple(readLines(testFile)))
 	print(readSplitLines(testFile))
+	print(readTextFile(testFile).split())
 	print()
 
 	print(list(iteratePathParts("C:/abc"    )))
