@@ -285,7 +285,7 @@ class LocalDirEntry:
 if __name__ == "__main__": # Example usage
 	from os.path import isdir as isDir, isfile as isFile # use this instead of my _isPath*
 
-	from myLibs.fileUtils import _isPathDir, _isPathFile, createSymlink, readLines, readSplitLines, readTextFile
+	from myLibs.fileUtils import _isPathDir, _isPathFile, createSymlink, readLines, readTextFile
 
 	print(_isPathFile(__file__), isFile(__file__))
 	print(_isPathDir(__file__), isDir(__file__))
@@ -294,7 +294,6 @@ if __name__ == "__main__": # Example usage
 
 	print(readTextFile(testFile))
 	print(tuple(readLines(testFile)))
-	print(readSplitLines(testFile))
 	print(readTextFile(testFile).split())
 	print()
 
