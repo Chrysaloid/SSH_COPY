@@ -4,7 +4,10 @@ from datetime import datetime as _datetime
 import glob as _glob
 import os as _os
 import re as _re
-from stat import S_ISDIR as _S_ISDIR, S_ISREG as _S_ISREG
+import shutil as _shutil
+from stat import S_ISDIR as _S_ISDIR, S_ISREG as _S_ISREG, S_ISVTX as _S_ISVTX
+import sys as _sys
+from urllib.parse import quote as _quote
 
 from .SimpleError import SimpleError as _SimpleError
 
@@ -23,6 +26,108 @@ def write(path: str | _Path, encoding="UTF-8"):
 def append(path: str | _Path, encoding="UTF-8"):
 	""" Append UTF-8 text to file """
 	return open(path, "at", encoding=encoding)
+
+IS_WINDOWS = _sys.platform == "win32"
+
+if IS_WINDOWS:
+	import ctypes as _ctypes
+	import ctypes.wintypes as _wt
+
+	class _ShFileOpStructW(_ctypes.Structure):
+		_fields_ = [
+			("hwnd"                  , _wt.HWND),
+			("wFunc"                 , _wt.UINT),
+			("pFrom"                 , _wt.LPCWSTR),
+			("pTo"                   , _wt.LPCWSTR),
+			("fFlags"                , _ctypes.c_uint),
+			("fAnyOperationsAborted" , _wt.BOOL),
+			("hNameMappings"         , _ctypes.c_uint),
+			("lpszProgressTitle"     , _wt.LPCWSTR),
+		]
+
+	def _recycleWindows(path: str) -> None:
+		op = _ShFileOpStructW(
+			hwnd   = None,
+			wFunc  = 3, # FO_DELETE
+			pFrom  = path + "\0\0",
+			pTo    = None,
+			fFlags = 0x0040 | 0x0010 | 0x0004 | 0x0400, # ALLOWUNDO | NOCONFIRMATION | SILENT | NOERRORUI
+		)
+		res = _ctypes.windll.shell32.SHFileOperationW(_ctypes.byref(op))
+		if res != 0 or op.fAnyOperationsAborted:
+			raise OSError(f"SHFileOperationW failed on {path}: code {res}, aborted {op.fAnyOperationsAborted}")
+
+def _mountPointOf(path: str):
+	""" Topmost directory of the filesystem `path` lives on (`path` must exist) """
+	dev = _os.lstat(path).st_dev
+	while True:
+		parent = _os.path.dirname(path)
+		if parent == path or _os.lstat(parent).st_dev != dev:
+			return path
+		path = parent
+
+def _volumeTrashDir(topDir: str):
+	"""
+	Trash directory of a non-home volume, per the freedesktop.org trash spec:
+	`$topdir/.Trash/$uid` when an admin-created sticky, non-symlink `$topdir/.Trash` exists,
+	otherwise our own `$topdir/.Trash-$uid`
+	"""
+	uid = _os.getuid()
+	adminTrash = _os.path.join(topDir, ".Trash")
+	if not _os.path.islink(adminTrash) and _os.path.isdir(adminTrash) and (_os.stat(adminTrash).st_mode & _S_ISVTX):
+		return _os.path.join(adminTrash, str(uid))
+	return _os.path.join(topDir, f".Trash-{uid}")
+
+def _recycleXdgTrash(path: str) -> None:
+	homeTrash = _os.path.join(_os.environ.get("XDG_DATA_HOME") or _os.path.expanduser("~/.local/share"), "Trash")
+	ensureFolderExists(homeTrash)
+	trashDir = homeTrash
+	relativeTo = ""
+	if _os.lstat(path).st_dev != _os.lstat(homeTrash).st_dev: # A trash can must live on the same filesystem as the file - moving across one would be a copy + permanent delete
+		relativeTo = _mountPointOf(path)
+		trashDir = _volumeTrashDir(relativeTo)
+		try:
+			ensureFolderExists(trashDir)
+		except OSError as e:
+			raise _SimpleError(f'"{path}" is on the volume "{relativeTo}", which has no usable trash can ({e}) - refusing to delete it permanently') from e
+
+	filesDir = _os.path.join(trashDir, "files")
+	infoDir = _os.path.join(trashDir, "info")
+	ensureFolderExists(filesDir)
+	ensureFolderExists(infoDir)
+
+	name = _os.path.basename(path.rstrip("/"))
+	base, ext = _os.path.splitext(name)
+	trashName = name
+	for i in range(1, 10000): # The name must be unique inside the trash can - keep the extension so the file stays recognizable
+		infoPath = _os.path.join(infoDir, trashName + ".trashinfo")
+		try:
+			fd = _os.open(infoPath, _os.O_CREAT | _os.O_EXCL | _os.O_WRONLY, 0o600) # Creating the .trashinfo file exclusively is what reserves the name
+			break
+		except FileExistsError:
+			trashName = f"{base}_{i}{ext}"
+	else:
+		raise _SimpleError(f'Could not find a free name for "{path}" in the trash can "{trashDir}"')
+
+	origPath = path if not relativeTo else _os.path.relpath(path, relativeTo)
+	with _os.fdopen(fd, "wt", encoding="UTF-8") as f:
+		f.write(f"[Trash Info]\nPath={_quote(origPath)}\nDeletionDate={_datetime.now().strftime('%Y-%m-%dT%H:%M:%S')}\n")
+
+	try:
+		_shutil.move(path, _os.path.join(filesDir, trashName)) # Same filesystem, so this is a plain rename
+	except BaseException:
+		_os.remove(infoPath)
+		raise
+
+def recycle(path: str | _Path) -> None:
+	""" Sends `path` to the Recycle Bin / trash can (never a permanent delete) """
+	path = _os.path.abspath(str(path))
+	if IS_WINDOWS:
+		_recycleWindows(path)
+	else:
+		_recycleXdgTrash(path)
+	if _os.path.lexists(path):
+		raise OSError(f"{path} still exists after the recycle attempt")
 
 def sanitizeFilename(name: str):
 	name = name.strip().rstrip(".")
