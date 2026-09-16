@@ -239,8 +239,8 @@ def createSymlink(linkName, target):
 
 	_os.symlink(target, linkName, target_is_directory=_os.path.isdir(target))
 
-def readTextFile(path: str | _Path, encoding="UTF-8"):
-	with open(path, "rt", encoding=encoding) as f:
+def readTextFile(path: str | _Path, encoding="UTF-8", newline=None):
+	with open(path, "rt", encoding=encoding, newline=newline) as f:
 		return f.read()
 
 def readLines(path: str | _Path, keep_empty_lines=False, keep_line_endings=False, encoding="UTF-8"):
@@ -263,8 +263,8 @@ def readLines(path: str | _Path, keep_empty_lines=False, keep_line_endings=False
 					if line:
 						yield line
 
-def writeTextFile(path: str | _Path, text: str, append=False, encoding="UTF-8"):
-	with open(path, "at" if append else "wt", encoding=encoding) as f:
+def writeTextFile(path: str | _Path, text: str, append=False, encoding="UTF-8", newline=None):
+	with open(path, "at" if append else "wt", encoding=encoding, newline=newline) as f:
 		return f.write(text)
 
 def writeLines(path: str | _Path, lines: list[str], append=False, encoding="UTF-8"):
