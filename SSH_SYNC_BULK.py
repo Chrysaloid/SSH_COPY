@@ -14,7 +14,7 @@ from typing import Callable, Tuple
 from termcolor import colored as clr, cprint
 
 from .argparseUtils import ArgumentParser_ColoredError, COMMON_FORMATTER_CLASS
-from .fileUtils import assertFolderExists as assertLocalFolderExists, isDir, isFile
+from .fileUtils import assertFolderExists as assertLocalFolderExists, isDir
 from .LocalSFTPAttributes import local_listdir_attr, LocalSFTPAttributes
 from .printRelTime import getRelTime
 from .SimpleError import SimpleError

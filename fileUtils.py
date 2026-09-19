@@ -5,7 +5,7 @@ import glob as _glob
 import os as _os
 import re as _re
 import shutil as _shutil
-from stat import S_ISDIR as _S_ISDIR, S_ISREG as _S_ISREG, S_ISVTX as _S_ISVTX
+from stat import S_ISDIR as _S_ISDIR, S_ISLNK as _S_ISLNK, S_ISREG as _S_ISREG, S_ISVTX as _S_ISVTX
 import sys as _sys
 from urllib.parse import quote as _quote
 
@@ -159,6 +159,12 @@ def sanitizeFilename(name: str):
 
 def isFile(stats: _os.stat_result):
 	return _S_ISREG(stats.st_mode)
+
+def isSymlink(stats: _os.stat_result):
+	return _S_ISLNK(stats.st_mode)
+
+def isFileOrSymlink(stats: _os.stat_result):
+	return _S_ISREG(stats.st_mode) or _S_ISLNK(stats.st_mode)
 
 def isDir(stats: _os.stat_result):
 	return _S_ISDIR(stats.st_mode)
