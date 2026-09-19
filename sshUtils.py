@@ -198,9 +198,10 @@ def ensureRemoteFolderExists(sftp: _paramiko.SFTPClient, remotePath: str):
 	return created
 
 class RemoteListDir:
-	def __init__(self, ssh: _paramiko.SSHClient, pythonStr = "python", init = False):
+	def __init__(self, ssh: _paramiko.SSHClient, pythonStr = "python", init = False, follow_symlinks = False):
 		self.ssh = ssh
 		self.pythonStr = pythonStr
+		self.follow_symlinks = str(bool(follow_symlinks))
 		self.stdin: _paramiko.ChannelFile | None = None
 		self.stdout: _paramiko.ChannelFile | None = None
 		self.stderr: _paramiko.ChannelFile | None = None
@@ -214,7 +215,7 @@ class RemoteListDir:
 				"while (s := input()):\\n"
 				"	with os.scandir(s) as d:\\n"
 				"		for e in d:\\n"
-				"			i = e.stat(follow_symlinks=0); print(e.name, '%x/%x/%x/%x' % (i.st_mode, i.st_size, int(i.st_atime), int(i.st_mtime)), sep='/')\\n"
+				f"			i = e.stat(follow_symlinks={self.follow_symlinks}); print(e.name, '%x/%x/%x/%x' % (i.st_mode, i.st_size, int(i.st_atime), int(i.st_mtime)), sep='/')\\n"
 				"		print('', flush=1)"
 			)
 			cmd = f'{self.pythonStr} -c "exec(\\\"{code}\\\")"'

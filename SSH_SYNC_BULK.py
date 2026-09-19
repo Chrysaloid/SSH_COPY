@@ -454,7 +454,7 @@ def main(args: Namespace = None):
 				delete(sPath)
 
 	# it's only noticeably faster if one of the remote folders that will be scanned has more than 5000 entries
-	rld = RemoteListDir(ssh, init=False) # don't init the remote python script because remote_listdir_attr might not get called at all
+	rld = RemoteListDir(ssh, init=False, follow_symlinks=True) # don't init the remote python script because remote_listdir_attr might not get called at all
 	remote_listdir_attr = rld.listdir_attr
 
 	localDirListCache = {}
