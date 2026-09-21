@@ -27,6 +27,18 @@ def append(path: str | _Path, encoding="UTF-8"):
 	""" Append UTF-8 text to file """
 	return open(path, "at", encoding=encoding)
 
+def read_binary(path: str | _Path):
+	""" Read file as bytes """
+	return open(path, "rb")
+
+def write_binary(path: str | _Path):
+	""" Write file as bytes """
+	return open(path, "wb")
+
+def append_binary(path: str | _Path):
+	""" Append bytes to file """
+	return open(path, "ab")
+
 IS_WINDOWS = _sys.platform == "win32"
 
 if IS_WINDOWS:
