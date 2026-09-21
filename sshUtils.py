@@ -1,6 +1,7 @@
 from pathlib import Path as _Path; __package__ = __package__ or _Path(__file__).resolve().parent.name # To be able to use relative imports when run directly - never override a __package__ Python already set (see README)
 
 from enum import auto, IntEnum
+import logging as _logging
 import socket as _socket
 
 import paramiko as _paramiko
@@ -43,12 +44,23 @@ def getSSH(
 	port = 22,
 	silent = False
 ) -> tuple[_paramiko.SSHClient, bool]:
+	# paramiko reports a failed connection twice: as the exception handled below, and through
+	# the "paramiko" logger, from its transport thread, as "Exception (client): ..." plus a
+	# full traceback. In a program that never configured logging, that second copy lands on
+	# stderr via logging's last-resort handler - a wall of traceback in front of our own
+	# one-line message, e.g. whenever 127.0.0.1 is an adb forward with no server behind it.
+	# A NullHandler stops only that fallback: a program that does configure logging (like
+	# ssh-server.py) still gets every paramiko record through propagation.
+	paramiko_logger = _logging.getLogger("paramiko")
+	if not any(isinstance(handler, _logging.NullHandler) for handler in paramiko_logger.handlers):
+		paramiko_logger.addHandler(_logging.NullHandler())
+
 	ssh = _paramiko.SSHClient()
 	ssh.set_missing_host_key_policy(_paramiko.AutoAddPolicy())
 
 	if isinstance(hostnames, str): hostnames = [hostnames]
 
-	thereWasSSHError = False
+	there_was_SSH_error = False
 	for hostname in hostnames:
 		errorMessage = None
 		try:
@@ -101,13 +113,13 @@ def getSSH(
 			errorMessage = f"ERROR: Socket error while connecting to {hostname}: {e}"
 
 		if errorMessage:
-			thereWasSSHError = True
+			there_was_SSH_error = True
 			_cprint(errorMessage, _COLOR_ERROR)
 
 	if errorMessage:
 		raise _SimpleError("", None)
 
-	return ssh, thereWasSSHError
+	return ssh, there_was_SSH_error
 
 def get_output_of_remote_command(ssh: _paramiko.SSHClient, command: str) -> str:
 	""" Runs a command remotely and returns its stripped, lowercased stdout ("" if anything went wrong) """
