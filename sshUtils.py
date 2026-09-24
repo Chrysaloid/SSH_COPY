@@ -81,12 +81,15 @@ def getSSH(
 		if isinstance(hosts, str):
 			hosts = [hosts]
 
-		hosts = map(parse_host, hosts)
+		hosts = tuple(map(parse_host, hosts))
 	else:
 		if isinstance(hostnames, str):
 			hostnames = [hostnames]
 
-		hosts = zip([username] * len(hostnames), hostnames, [port] * len(hostnames))
+		hosts = tuple(zip([username] * len(hostnames), hostnames, [port] * len(hostnames)))
+
+	if not hosts:
+		raise _SimpleError("hosts cannot be empty")
 
 	there_was_SSH_error = False
 	for username, hostname, port in hosts:
