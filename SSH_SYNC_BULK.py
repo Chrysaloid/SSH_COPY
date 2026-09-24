@@ -139,8 +139,9 @@ def main(args: Namespace = None):
 			help="Operation to perform. Can be specified multiple times",
 			dest="operations",
 		)
-		required.add_argument("-u", "--username", required=True, default="", help="Remote username")
-		required.add_argument("-H", "--hostname", required=True, default="", nargs="+", help="Remote host's address. You can specify multiple if host can appear under multiple adresses")
+		required.add_argument("-u", "--username", required=False, default="", help="Remote username")
+		required.add_argument("-H", "--hostname", required=False, default="", nargs="*", help="Remote host's address. You can specify multiple if host can appear under multiple adresses")
+		required.add_argument("-S", "--hosts"   , required=False, default="", nargs="*", help="Remote hosts to try (i.e. user@192.168.0.123:1234). You can specify multiple if host can appear under multiple adresses. Takes precedence over others")
 
 		parser._optionals.title = "Optional arguments"
 
@@ -157,7 +158,8 @@ def main(args: Namespace = None):
 
 	operations             : list  [list[str]] = args.operations
 	username               : str               = args.username
-	hostname               : str               = args.hostname
+	hostname               : list[str]         = args.hostname
+	hosts                  : list[str]         = args.hosts
 	password               : str               = args.password
 	port                   : int               = args.port
 	timeout                : float             = args.timeout
@@ -169,6 +171,9 @@ def main(args: Namespace = None):
 
 	if silent and verbose:
 		raise SimpleError("-s/--silent and -v/--verbose options cannot both be specified at the same time")
+
+	if (not username and not hostname and not hosts) or (hostname and not username) or (username and not hostname):
+		raise SimpleError("Either -u/--username and -H/--hostname or -S/--hosts needs to be specified")
 
 	if argsFromCli:
 		parsedOperations = []
@@ -188,6 +193,7 @@ def main(args: Namespace = None):
 		username  = username,
 		hostnames = hostname,
 		password  = password,
+		hosts     = hosts   ,
 		timeout   = timeout ,
 		port      = port    ,
 		silent    = silent  ,

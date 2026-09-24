@@ -35,10 +35,29 @@ class OS(IntEnum):
 	MAC     = auto()
 	UNKNOWN = auto()
 
+def parse_host(host: str) -> tuple[str, str, int]:
+	try:
+		user, rest = host.split("@")
+	except ValueError:
+		raise _SimpleError(f"Invalid host format: {host}. Should be user@192.168.0.123:1234")
+
+	try:
+		hostname, port = rest.split(":")
+	except ValueError:
+		raise _SimpleError(f"Invalid host format: {host}. Should be user@192.168.0.123:1234")
+
+	try:
+		port = int(port)
+	except ValueError:
+		raise _SimpleError(f"Invalid host format: {host}. Port should be int, you typed '{port}'")
+
+	return user, hostname, port
+
 def getSSH(
 	username: str,
 	hostnames: str | list[str],
-	password: str,
+	password: str = None,
+	hosts: str | list[str] = None,
 	keyFilename: str = None,
 	timeout: float = 5,
 	port = 22,
@@ -58,21 +77,30 @@ def getSSH(
 	ssh = _paramiko.SSHClient()
 	ssh.set_missing_host_key_policy(_paramiko.AutoAddPolicy())
 
-	if isinstance(hostnames, str): hostnames = [hostnames]
+	if hosts:
+		if isinstance(hosts, str):
+			hosts = [hosts]
+
+		hosts = map(parse_host, hosts)
+	else:
+		if isinstance(hostnames, str):
+			hostnames = [hostnames]
+
+		hosts = zip([username] * len(hostnames), hostnames, [port] * len(hostnames))
 
 	there_was_SSH_error = False
-	for hostname in hostnames:
+	for username, hostname, port in hosts:
 		errorMessage = None
 		try:
 			if not silent:
-				print(f"Attempting to connect to {_clr(username, 'green')}@{_clr(hostname, 'green')} ...")
+				print(f"Attempting to connect to {_clr(username, 'green')}@{_clr(hostname, 'green')}:{_clr(port, 'green')} ...")
 			ssh.connect(
 				hostname     = hostname   ,
 				username     = username   ,
 				password     = password   ,
 				key_filename = keyFilename,
 				timeout      = timeout    ,
-				port         = port
+				port         = port       ,
 			)
 			break
 		except _BadHostKeyException:

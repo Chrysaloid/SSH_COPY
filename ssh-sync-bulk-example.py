@@ -7,6 +7,7 @@ from .SSH_SYNC_BULK import main, MODE, PLACE
 main(Namespace(
 	username               = "Test",
 	hostname               = "192.168.0.121",
+	hosts                  = "", # Test@192.168.0.121:22
 	password               = None,
 	port                   = 22,
 	timeout                = 5,
