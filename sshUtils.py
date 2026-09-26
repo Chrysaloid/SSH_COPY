@@ -1,5 +1,6 @@
 from pathlib import Path as _Path; __package__ = __package__ or _Path(__file__).resolve().parent.name # To be able to use relative imports when run directly - never override a __package__ Python already set (see README)
 
+import base64 as _base64
 from enum import auto, IntEnum
 import logging as _logging
 import socket as _socket
@@ -53,6 +54,14 @@ def parse_host(host: str) -> tuple[str, str, int]:
 
 	return user, hostname, port
 
+def parseHostKey(hostKey: str) -> _paramiko.PKey:
+	""" A public key as sshd's ssh_host_*_key.pub holds it: "ssh-ed25519 AAAA..." (a trailing comment is ignored) """
+	try:
+		keyType, blob = hostKey.split()[:2]
+		return _paramiko.PKey.from_type_string(keyType, _base64.b64decode(blob))
+	except Exception as e:
+		raise _SimpleError(f'Invalid host key "{hostKey[:40]}...": {e}. Should be "ssh-ed25519 AAAA..."')
+
 def getSSH(
 	username: str,
 	hostnames: str | list[str],
@@ -61,8 +70,24 @@ def getSSH(
 	keyFilename: str = None,
 	timeout: float = 5,
 	port = 22,
-	silent = False
+	silent = False,
+	hostKeys: str | list[str] | None = None,
 ) -> tuple[_paramiko.SSHClient, bool]:
+	"""
+	Connect to the first of hosts (user@host:port) - or of hostnames, all with username and
+	port - that lets us in. The list is a fallback for CONNECTING only.
+
+	hostKeys pins the machine: its public sshd host keys, as in ssh_host_*_key.pub. Every
+	address is then checked against them before logging in, and one presenting any other key
+	is rejected and the next tried - so an address that means a different machine on another
+	network (192.168.0.x at home vs at a friend's) is safe to keep in the list. Pin an
+	ed25519 key: paramiko asks the server for the first pinned key's type, and asking a modern
+	OpenSSH for plain "ssh-rsa" (SHA-1) can fail the handshake. Without hostKeys any key is
+	accepted, as before.
+
+	An address that timed out, refused, or presented the wrong key is not tried again with
+	the next user - only an authentication failure moves on to another user at the same address.
+	"""
 	# paramiko reports a failed connection twice: as the exception handled below, and through
 	# the "paramiko" logger, from its transport thread, as "Exception (client): ..." plus a
 	# full traceback. In a program that never configured logging, that second copy lands on
@@ -75,7 +100,17 @@ def getSSH(
 		paramiko_logger.addHandler(_logging.NullHandler())
 
 	ssh = _paramiko.SSHClient()
-	ssh.set_missing_host_key_policy(_paramiko.AutoAddPolicy())
+
+	if hostKeys:
+		if isinstance(hostKeys, str):
+			hostKeys = [hostKeys]
+		pinnedKeys = [parseHostKey(hostKey) for hostKey in hostKeys]
+
+		# With pinned keys every address gets them registered below, so the policy is never asked;
+		# RejectPolicy only makes sure an address that somehow slipped past would fail, not be trusted.
+		ssh.set_missing_host_key_policy(_paramiko.RejectPolicy())
+	else:
+		ssh.set_missing_host_key_policy(_paramiko.AutoAddPolicy())
 
 	if hosts:
 		if isinstance(hosts, str):
@@ -92,8 +127,22 @@ def getSSH(
 		raise _SimpleError("hosts cannot be empty")
 
 	there_was_SSH_error = False
+	connected = False
+	deadAddresses: set[tuple[str, int]] = set() # timed out, refused or the wrong machine - no other user will fare better
 	for username, hostname, port in hosts:
 		errorMessage = None
+		addressIsDead = False
+		if (hostname, port) in deadAddresses:
+			if not silent:
+				print(f"Skipping {username}@{hostname}:{port} - that address already failed")
+			continue
+
+		if hostKeys:
+			# paramiko looks keys up under the same name it would use in known_hosts
+			keyName = hostname if port == 22 else f"[{hostname}]:{port}"
+			for pinnedKey in pinnedKeys:
+				ssh.get_host_keys().add(keyName, pinnedKey.get_name(), pinnedKey)
+
 		try:
 			if not silent:
 				print(f"Attempting to connect to {_clr(username, 'green')}@{_clr(hostname, 'green')}:{_clr(port, 'green')} ...")
@@ -105,14 +154,17 @@ def getSSH(
 				timeout      = timeout    ,
 				port         = port       ,
 			)
+			connected = True
 			break
-		except _BadHostKeyException:
-			errorMessage = f"ERROR: The server's host key could not be verified for {hostname}"
+		except _BadHostKeyException as e:
+			addressIsDead = True
+			errorMessage = f"ERROR: {hostname}:{port} presented host key {e.key.fingerprint}, not the pinned {e.expected_key.fingerprint} - a different machine, skipped before logging in"
 		except _AuthenticationException:
 			errorMessage = f"ERROR: Authentication failed when connecting to {hostname}"
 		except _PartialAuthentication:
 			errorMessage = f"ERROR: Partial authentication occurred when connecting to {hostname}"
 		except _NoValidConnectionsError:
+			addressIsDead = True
 			errorMessage = f"ERROR: No valid connections could be made to {hostname} (connection refused or unreachable)"
 		except _PasswordRequiredException:
 			errorMessage = f"ERROR: The private key is encrypted and requires a passphrase"
@@ -123,6 +175,7 @@ def getSSH(
 		except FileNotFoundError as e:
 			errorMessage = f"ERROR: SSH key file not found: {e.filename}"
 		except _socket.timeout | TimeoutError:
+			addressIsDead = True
 			errorMessage = f"ERROR: Connection to {hostname} timed out after {timeout} seconds"
 		except _ChannelException as e:
 			errorMessage = f"ERROR: Failed to open an SSH channel while connecting to {hostname} (channel {e.code}: {e.text})"
@@ -141,13 +194,17 @@ def getSSH(
 			else:
 				errorMessage = f"ERROR: SSH error while connecting to {hostname}: {msg}"
 		except _socket.error as e:
+			addressIsDead = True
 			errorMessage = f"ERROR: Socket error while connecting to {hostname}: {e}"
 
 		if errorMessage:
 			there_was_SSH_error = True
 			_cprint(errorMessage, _COLOR_ERROR)
+		if addressIsDead:
+			deadAddresses.add((hostname, port))
 
-	if errorMessage:
+	# Not "if errorMessage": a skipped last entry leaves it None although nothing connected
+	if not connected:
 		raise _SimpleError("", None)
 
 	return ssh, there_was_SSH_error
