@@ -7,8 +7,10 @@ import re as _re
 import shutil as _shutil
 from stat import S_ISDIR as _S_ISDIR, S_ISLNK as _S_ISLNK, S_ISREG as _S_ISREG, S_ISVTX as _S_ISVTX
 import sys as _sys
+from typing import Callable
 from urllib.parse import quote as _quote
 
+from .listGet import listGet
 from .SimpleError import SimpleError as _SimpleError
 
 WINDOWS_RESERVED_NAMES = set("con, prn, aux, nul, com1, com2, com3, com4, com5, com6, com7, com8, com9, com¹, com², com³, lpt1, lpt2, lpt3, lpt4, lpt5, lpt6, lpt7, lpt8, lpt9, lpt¹, lpt², lpt³".split(", "))
@@ -289,8 +291,19 @@ def writeLines(path: str | _Path, lines: list[str], append=False, encoding="UTF-
 	with open(path, "at" if append else "wt", encoding=encoding) as f:
 		return f.write("\n".join(lines)) + f.write("\n")
 
-def globOneFile(globPattern: str):
-	return next(_glob.iglob(str(globPattern)), None).replace("\\","/")
+def globOneFile(
+	glob_path_pattern: str,
+	name_sort_key: Callable = None,
+	name_sort_reverse: bool = None,
+	recursive = False,
+	include_hidden = False,
+) -> str:
+	name_iter = _glob.iglob(str(glob_path_pattern), recursive=recursive, include_hidden=include_hidden)
+	if name_sort_key or name_sort_reverse is not None:
+		the_one = listGet(sorted(name_iter, key=name_sort_key, reverse=name_sort_reverse), 0, "")
+	else:
+		the_one = next(name_iter, "")
+	return the_one.replace("\\","/")
 
 class LocalDirEntry:
 	def __init__(self, absPath: str):
