@@ -17,17 +17,17 @@ WINDOWS_RESERVED_NAMES = set("con, prn, aux, nul, com1, com2, com3, com4, com5, 
 INVALID_FILENAME_CHARS = _re.compile(r'[<>:"/\|?*\x00-\x1F]')
 FILENAME_EXT_SPLIT = _re.compile(r"^(.*?)(\.\w*?)$")
 
-def read(path: str | _Path, encoding="UTF-8"):
+def read(path: str | _Path, encoding="UTF-8", newline="\n"):
 	""" Read file as UTF-8 text """
-	return open(path, "rt", encoding=encoding)
+	return open(path, "rt", encoding=encoding, newline=newline)
 
-def write(path: str | _Path, encoding="UTF-8"):
+def write(path: str | _Path, encoding="UTF-8", newline="\n"):
 	""" Write file as UTF-8 text """
-	return open(path, "wt", encoding=encoding)
+	return open(path, "wt", encoding=encoding, newline=newline)
 
-def append(path: str | _Path, encoding="UTF-8"):
+def append(path: str | _Path, encoding="UTF-8", newline="\n"):
 	""" Append UTF-8 text to file """
-	return open(path, "at", encoding=encoding)
+	return open(path, "at", encoding=encoding, newline=newline)
 
 def read_binary(path: str | _Path):
 	""" Read file as bytes """
