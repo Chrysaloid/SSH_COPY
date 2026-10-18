@@ -1,9 +1,13 @@
 from pathlib import Path as _Path; __package__ = __package__ or _Path(__file__).resolve().parent.name # To be able to use relative imports when run directly - never override a __package__ Python already set (see README)
 
 import base64 as _base64
+from collections.abc import Callable as _Callable
 from enum import auto, IntEnum
+from functools import partial as _partial
 import logging as _logging
+import queue as _queue
 import socket as _socket
+import threading as _threading
 
 import paramiko as _paramiko
 from paramiko.ssh_exception import (
@@ -62,6 +66,163 @@ def parseHostKey(hostKey: str) -> _paramiko.PKey:
 	except Exception as e:
 		raise _SimpleError(f'Invalid host key "{hostKey[:40]}...": {e}. Should be "ssh-ed25519 AAAA..."')
 
+def _new_ssh_client(pinned_keys: list[_paramiko.PKey] | None) -> _paramiko.SSHClient:
+	ssh = _paramiko.SSHClient()
+	# With pinned keys every address gets them registered before connecting, so the policy is never asked;
+	# RejectPolicy only makes sure an address that somehow slipped past would fail, not be trusted.
+	ssh.set_missing_host_key_policy(_paramiko.RejectPolicy() if pinned_keys else _paramiko.AutoAddPolicy())
+	return ssh
+
+def _connect_once(
+	ssh: _paramiko.SSHClient,
+	username: str,
+	hostname: str,
+	port: int,
+	*,
+	password: str | None,
+	key_filename: str | None,
+	timeout: float,
+	silent: bool,
+	pinned_keys: list[_paramiko.PKey] | None,
+) -> tuple[str | None, bool]:
+	""" One login attempt. Returns (errorMessage, addressIsDead) - errorMessage None means ssh is connected """
+	errorMessage = None
+	addressIsDead = False
+	if pinned_keys:
+		# paramiko looks keys up under the same name it would use in known_hosts
+		keyName = hostname if port == 22 else f"[{hostname}]:{port}"
+		for pinnedKey in pinned_keys:
+			ssh.get_host_keys().add(keyName, pinnedKey.get_name(), pinnedKey)
+
+	try:
+		if not silent:
+			print(f"Attempting to connect to {_clr(username, 'green')}@{_clr(hostname, 'green')}:{_clr(port, 'green')} ...")
+		ssh.connect(
+			hostname     = hostname    ,
+			username     = username    ,
+			password     = password    ,
+			key_filename = key_filename,
+			timeout      = timeout     ,
+			port         = port        ,
+		)
+	except _BadHostKeyException as e:
+		addressIsDead = True
+		errorMessage = f"ERROR: {hostname}:{port} presented host key {e.key.fingerprint}, not the pinned {e.expected_key.fingerprint} - a different machine, skipped before logging in"
+	except _AuthenticationException:
+		errorMessage = f"ERROR: Authentication failed when connecting to {hostname}"
+	except _PartialAuthentication:
+		errorMessage = f"ERROR: Partial authentication occurred when connecting to {hostname}"
+	except _NoValidConnectionsError:
+		addressIsDead = True
+		errorMessage = f"ERROR: No valid connections could be made to {hostname} (connection refused or unreachable)"
+	except _PasswordRequiredException:
+		errorMessage = f"ERROR: The private key is encrypted and requires a passphrase"
+	except _BadAuthenticationType as e:
+		errorMessage = f"ERROR: Unsupported authentication type. Allowed types: {", ".join(e.allowed_types)}"
+	except _ProxyCommandFailure as e:
+		errorMessage = f"ERROR: Proxy command failed: {e}"
+	except FileNotFoundError as e:
+		errorMessage = f"ERROR: SSH key file not found: {e.filename}"
+	except _socket.timeout | TimeoutError:
+		addressIsDead = True
+		errorMessage = f"ERROR: Connection to {hostname} timed out after {timeout} seconds"
+	except _ChannelException as e:
+		errorMessage = f"ERROR: Failed to open an SSH channel while connecting to {hostname} (channel {e.code}: {e.text})"
+	except _ConfigParseError:
+		errorMessage = f"ERROR: Failed to parse the SSH configuration file"
+	except _CouldNotCanonicalize:
+		errorMessage = f"ERROR: Failed to canonicalize the hostname {hostname}"
+	except _IncompatiblePeer:
+		errorMessage = f"ERROR: SSH negotiation failed because {hostname} is incompatible with this SSH client"
+	except _MessageOrderError:
+		errorMessage = f"ERROR: Invalid SSH message order was received from {hostname}"
+	except _SSHException as e:
+		msg = str(e)
+		if "No authentication method" in msg:
+			errorMessage = f"ERROR: No authentication method available. No password was supplied and no usable SSH keys were found"
+		else:
+			errorMessage = f"ERROR: SSH error while connecting to {hostname}: {msg}"
+	except _socket.error as e:
+		addressIsDead = True
+		errorMessage = f"ERROR: Socket error while connecting to {hostname}: {e}"
+
+	if errorMessage is not None:
+		# A failed login (e.g. the wrong user) leaves its transport open, and the next connect()
+		# on this client would just drop the reference to it - a live connection leaked per failure.
+		# Closing keeps the client reusable, host keys included.
+		ssh.close()
+
+	return errorMessage, addressIsDead
+
+def _connect_in_parallel(
+	options: dict[tuple[str, int], list[str]],
+	attempt: _Callable[[_paramiko.SSHClient, str, str, int], tuple[str | None, bool]],
+	pinned_keys: list[_paramiko.PKey] | None,
+	silent: bool,
+) -> tuple[_paramiko.SSHClient | None, bool]:
+	"""
+	Tries every address at once, one daemon thread each, going through its usernames in order.
+	Returns the first client that logs in (None if none did) and whether an error was printed
+	before that. The losing threads are left to finish on their own: one that still logs in
+	closes its client, and nothing they hit afterwards is printed. Daemon threads, so a
+	connect still hanging in one of them never holds up the interpreter's exit.
+	"""
+	results: _queue.SimpleQueue[_paramiko.SSHClient | Exception | None] = _queue.SimpleQueue()
+	lock = _threading.Lock() # makes "who won" and every print after it one decision
+	won = _threading.Event()
+	there_was_SSH_error = False
+
+	def try_address(hostname: str, port: int, usernames: list[str]) -> None:
+		nonlocal there_was_SSH_error
+		ssh = _new_ssh_client(pinned_keys)
+		outcome: _paramiko.SSHClient | Exception | None = None
+		try:
+			for i, username in enumerate(usernames):
+				if won.is_set():
+					break
+				errorMessage, addressIsDead = attempt(ssh, username, hostname, port)
+				with lock:
+					if won.is_set():
+						break # the caller already has its connection - stay quiet
+					if errorMessage is None:
+						won.set()
+						outcome = ssh
+						break
+					there_was_SSH_error = True
+					_cprint(errorMessage, _COLOR_ERROR)
+					if addressIsDead:
+						if not silent:
+							for skipped in usernames[i + 1:]:
+								print(f"Skipping {skipped}@{hostname}:{port} - that address already failed")
+						break
+		except Exception as e: # not a connection failure (those are all handled in _connect_once) - the caller gets it if nobody connects
+			outcome = e
+		finally:
+			if outcome is not ssh:
+				ssh.close()
+			results.put(outcome)
+
+	for (hostname, port), usernames in options.items():
+		_threading.Thread(target=try_address, args=(hostname, port, usernames), name=f"getSSH {hostname}:{port}", daemon=True).start()
+
+	firstException: Exception | None = None
+	for _ in options:
+		while True:
+			try:
+				outcome = results.get(timeout=0.1) # a get() with no timeout cannot be interrupted by Ctrl+C on Windows
+				break
+			except _queue.Empty:
+				pass
+		if isinstance(outcome, _paramiko.SSHClient):
+			with lock:
+				return outcome, there_was_SSH_error
+		if isinstance(outcome, Exception) and firstException is None:
+			firstException = outcome
+
+	if firstException is not None:
+		raise firstException
+	return None, there_was_SSH_error
+
 def getSSH(
 	username: str,
 	hostnames: str | list[str],
@@ -72,6 +233,7 @@ def getSSH(
 	port = 22,
 	silent = False,
 	hostKeys: str | list[str] | None = None,
+	parallel_connect: bool = True,
 ) -> tuple[_paramiko.SSHClient, bool]:
 	"""
 	Connect to the first of hosts (user@host:port) - or of hostnames, all with username and
@@ -87,6 +249,11 @@ def getSSH(
 
 	An address that timed out, refused, or presented the wrong key is not tried again with
 	the next user - only an authentication failure moves on to another user at the same address.
+
+	parallel_connect tries all addresses (hostname+port) at once instead of one by one, each
+	going through its users in the order given, and returns the first client that logs in -
+	still synchronously. Errors the other addresses hit after that are not printed. With only
+	one address there is nothing to race, so the hosts are then tried one by one regardless.
 	"""
 	# paramiko reports a failed connection twice: as the exception handled below, and through
 	# the "paramiko" logger, from its transport thread, as "Exception (client): ..." plus a
@@ -96,21 +263,14 @@ def getSSH(
 	# A NullHandler stops only that fallback: a program that does configure logging (like
 	# ssh-server.py) still gets every paramiko record through propagation.
 	paramiko_logger = _logging.getLogger("paramiko")
-	if not any(isinstance(handler, _logging.NullHandler) for handler in paramiko_logger.handlers):
+	if all(not isinstance(handler, _logging.NullHandler) for handler in paramiko_logger.handlers):
 		paramiko_logger.addHandler(_logging.NullHandler())
 
-	ssh = _paramiko.SSHClient()
-
+	pinnedKeys = None
 	if hostKeys:
 		if isinstance(hostKeys, str):
 			hostKeys = [hostKeys]
 		pinnedKeys = [parseHostKey(hostKey) for hostKey in hostKeys]
-
-		# With pinned keys every address gets them registered below, so the policy is never asked;
-		# RejectPolicy only makes sure an address that somehow slipped past would fail, not be trusted.
-		ssh.set_missing_host_key_policy(_paramiko.RejectPolicy())
-	else:
-		ssh.set_missing_host_key_policy(_paramiko.AutoAddPolicy())
 
 	if hosts:
 		if isinstance(hosts, str):
@@ -126,80 +286,36 @@ def getSSH(
 	if not hosts:
 		raise _SimpleError("hosts cannot be empty")
 
+	attempt = _partial(_connect_once, password=password, key_filename=keyFilename, timeout=timeout, silent=silent, pinned_keys=pinnedKeys)
+
+	options: dict[tuple[str, int], list[str]] = {} # (hostname, port) -> its usernames in the order they came
+	for username, hostname, port in hosts:
+		options.setdefault((hostname, port), []).append(username)
+
+	parallel_connect = parallel_connect and len(options) > 1
+	if parallel_connect:
+		ssh, there_was_SSH_error = _connect_in_parallel(options, attempt, pinnedKeys, silent)
+		if ssh is None:
+			raise _SimpleError("", None)
+		return ssh, there_was_SSH_error
+
+	ssh = _new_ssh_client(pinnedKeys)
 	there_was_SSH_error = False
 	connected = False
 	deadAddresses: set[tuple[str, int]] = set() # timed out, refused or the wrong machine - no other user will fare better
 	for username, hostname, port in hosts:
-		errorMessage = None
-		addressIsDead = False
 		if (hostname, port) in deadAddresses:
 			if not silent:
 				print(f"Skipping {username}@{hostname}:{port} - that address already failed")
 			continue
 
-		if hostKeys:
-			# paramiko looks keys up under the same name it would use in known_hosts
-			keyName = hostname if port == 22 else f"[{hostname}]:{port}"
-			for pinnedKey in pinnedKeys:
-				ssh.get_host_keys().add(keyName, pinnedKey.get_name(), pinnedKey)
-
-		try:
-			if not silent:
-				print(f"Attempting to connect to {_clr(username, 'green')}@{_clr(hostname, 'green')}:{_clr(port, 'green')} ...")
-			ssh.connect(
-				hostname     = hostname   ,
-				username     = username   ,
-				password     = password   ,
-				key_filename = keyFilename,
-				timeout      = timeout    ,
-				port         = port       ,
-			)
+		errorMessage, addressIsDead = attempt(ssh, username, hostname, port)
+		if errorMessage is None:
 			connected = True
 			break
-		except _BadHostKeyException as e:
-			addressIsDead = True
-			errorMessage = f"ERROR: {hostname}:{port} presented host key {e.key.fingerprint}, not the pinned {e.expected_key.fingerprint} - a different machine, skipped before logging in"
-		except _AuthenticationException:
-			errorMessage = f"ERROR: Authentication failed when connecting to {hostname}"
-		except _PartialAuthentication:
-			errorMessage = f"ERROR: Partial authentication occurred when connecting to {hostname}"
-		except _NoValidConnectionsError:
-			addressIsDead = True
-			errorMessage = f"ERROR: No valid connections could be made to {hostname} (connection refused or unreachable)"
-		except _PasswordRequiredException:
-			errorMessage = f"ERROR: The private key is encrypted and requires a passphrase"
-		except _BadAuthenticationType as e:
-			errorMessage = f"ERROR: Unsupported authentication type. Allowed types: {", ".join(e.allowed_types)}"
-		except _ProxyCommandFailure as e:
-			errorMessage = f"ERROR: Proxy command failed: {e}"
-		except FileNotFoundError as e:
-			errorMessage = f"ERROR: SSH key file not found: {e.filename}"
-		except _socket.timeout | TimeoutError:
-			addressIsDead = True
-			errorMessage = f"ERROR: Connection to {hostname} timed out after {timeout} seconds"
-		except _ChannelException as e:
-			errorMessage = f"ERROR: Failed to open an SSH channel while connecting to {hostname} (channel {e.code}: {e.text})"
-		except _ConfigParseError:
-			errorMessage = f"ERROR: Failed to parse the SSH configuration file"
-		except _CouldNotCanonicalize:
-			errorMessage = f"ERROR: Failed to canonicalize the hostname {hostname}"
-		except _IncompatiblePeer:
-			errorMessage = f"ERROR: SSH negotiation failed because {hostname} is incompatible with this SSH client"
-		except _MessageOrderError:
-			errorMessage = f"ERROR: Invalid SSH message order was received from {hostname}"
-		except _SSHException as e:
-			msg = str(e)
-			if "No authentication method" in msg:
-				errorMessage = f"ERROR: No authentication method available. No password was supplied and no usable SSH keys were found"
-			else:
-				errorMessage = f"ERROR: SSH error while connecting to {hostname}: {msg}"
-		except _socket.error as e:
-			addressIsDead = True
-			errorMessage = f"ERROR: Socket error while connecting to {hostname}: {e}"
 
-		if errorMessage:
-			there_was_SSH_error = True
-			_cprint(errorMessage, _COLOR_ERROR)
+		there_was_SSH_error = True
+		_cprint(errorMessage, _COLOR_ERROR)
 		if addressIsDead:
 			deadAddresses.add((hostname, port))
 
