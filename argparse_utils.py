@@ -7,77 +7,77 @@ from typing import Callable as _Callable
 
 from termcolor import colored as _clr
 
-from .commonConstants import COLOR_ERROR as _COLOR_ERROR
+from .common_constants import COLOR_ERROR as _COLOR_ERROR
 
 COMMON_FORMATTER_CLASS = lambda prog: _argparse.HelpFormatter(prog, max_help_position=30, width=100)
 
-class ArgumentParser_ColoredError(_argparse.ArgumentParser):
-	def __init__(self, *args, errorColor=_COLOR_ERROR, **kwargs):
+class ArgumentParser_colored_error(_argparse.ArgumentParser):
+	def __init__(self, *args, error_color=_COLOR_ERROR, **kwargs):
 		super().__init__(*args, **kwargs)
-		self.errorColor = errorColor
+		self.error_color = error_color
 
 	def error(self, message):
 		self.print_usage(_sys.stderr) # print usage as usual
-		self.exit(2, _clr(f"{self.prog}: error: {message}\n", self.errorColor))
+		self.exit(2, _clr(f"{self.prog}: error: {message}\n", self.error_color))
 
-class NoRepeatAction(_argparse.Action):
+class No_repeat_Action(_argparse.Action):
 	def __call__(self, parser, namespace, values, option_string=None):
 		if getattr(namespace, self.dest, None) is not None:
 			raise _argparse.ArgumentError(self, f"may only be specified once")
 		setattr(namespace, self.dest, values)
 
-class NameFilter:
-	def __init__(self, pattern: str, matchVal: bool, matchingFunc: _Callable[[str, str], bool]):
+class Name_filter:
+	def __init__(self, pattern: str, match_val: bool, matching_func: _Callable[[str, str], bool]):
 		self.pattern = pattern
-		self.matchVal = matchVal
-		self.matchingFunc = matchingFunc
+		self.match_val = match_val
+		self.matching_func = matching_func
 
-def filenameMatchCase(name: str, path: str, pat: str) -> bool:
+def filename_match_case(name: str, path: str, pat: str) -> bool:
 	return _fnmatchcase(name, pat)
 
-def filenameMatchNotCase(name: str, path: str, pat: str) -> bool:
+def filename_match_not_case(name: str, path: str, pat: str) -> bool:
 	# In general case one would use the following:
 	# return fnmatchcase(name.lower(), pat.lower())
 
 	# In our case we skip the .lower() for pat as we will do that only once in the __call__ method
 	return _fnmatchcase(name.lower(), pat)
 
-def pathMatchCase(name: str, path: str, pat: str) -> bool:
+def path_match_case(name: str, path: str, pat: str) -> bool:
 	""" I.e. pat = `/some/folder` should match paths `/some` and `/some/folder/file` so it allows
 	recursion to get to `/some/folder` from `/` and allows recursion to go to subfolders and files of
 	`/some/folder` """
 	return path.startswith(pat) or pat.startswith(path)
 
-def pathMatchNotCase(name: str, path: str, pat: str) -> bool:
-	pathLower = path.lower()
-	return pathLower.startswith(pat) or pat.startswith(pathLower)
+def path_match_not_case(name: str, path: str, pat: str) -> bool:
+	path_lower = path.lower()
+	return path_lower.startswith(pat) or pat.startswith(path_lower)
 
-class IncludeExcludeAction(_argparse.Action):
-	destDefaults = {}
+class Include_exclude_Action(_argparse.Action):
+	dest_defaults = {}
 
 	def __init__(self, option_strings: list[str], dest, **kwargs):
 		super().__init__(option_strings, dest, **kwargs)
 
 		if len(option_strings) != 2:
-			raise ValueError(f"IncludeExcludeAction should always have short and long parameter names specified")
+			raise ValueError(f"Include_exclude_Action should always have short and long parameter names specified")
 
-		longName = max(option_strings, key=len)
+		long_name = max(option_strings, key=len)
 
-		self.matchVal = longName.startswith("--include")
-		self.isPath = longName.endswith("path")
-		self.isCase = "case" in longName
-		self.entryType = "file" if "file" in longName else "folder"
+		self.match_val = long_name.startswith("--include")
+		self.is_path = long_name.endswith("path")
+		self.is_case = "case" in long_name
+		self.entry_type = "file" if "file" in long_name else "folder"
 
-		if self.isPath:
-			if self.isCase:
-				self.matchingFunc = pathMatchCase
+		if self.is_path:
+			if self.is_case:
+				self.matching_func = path_match_case
 			else:
-				self.matchingFunc = pathMatchNotCase
+				self.matching_func = path_match_not_case
 		else:
-			if self.isCase:
-				self.matchingFunc = filenameMatchCase
+			if self.is_case:
+				self.matching_func = filename_match_case
 			else:
-				self.matchingFunc = filenameMatchNotCase
+				self.matching_func = filename_match_not_case
 
 	def __call__(self, parser, namespace, values, option_string=None):
 		# Ensure the target list exists
@@ -88,16 +88,16 @@ class IncludeExcludeAction(_argparse.Action):
 
 		# If --include-* argument was first - by default exclude
 		# If --exclude-* argument was first - by default include
-		if self.entryType not in IncludeExcludeAction.destDefaults:
-			IncludeExcludeAction.destDefaults[self.entryType] = not self.matchVal
+		if self.entry_type not in Include_exclude_Action.dest_defaults:
+			Include_exclude_Action.dest_defaults[self.entry_type] = not self.match_val
 
 		for pattern in values:
 			pattern = pattern.strip()
 			if pattern:
-				pattern = pattern if self.isCase else pattern.lower()
+				pattern = pattern if self.is_case else pattern.lower()
 				pattern = pattern.replace("\\", "/").rstrip("/") # not conditional to support .gitignore style folder mathing
-				items.append(NameFilter(
+				items.append(Name_filter(
 					pattern,
-					self.matchVal,
-					self.matchingFunc
+					self.match_val,
+					self.matching_func
 				))

@@ -181,9 +181,9 @@ cython_debug/
 .cursorindexingignore
 
 SSH SYNC TEST.py
-SSH_CLIP.py
-handle-non-abs-paths.py
+ssh_clip.py
+handle_non_abs_paths.py
 handle-non-abs-paths-test.txt
 .isort.cfg
-ssh-sync-bulk-launcher.py
-simple-remote-copy.py
+ssh_sync_bulk_launcher.py
+simple_remote_copy.py

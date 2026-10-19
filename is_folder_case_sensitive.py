@@ -35,22 +35,22 @@ if _sys.platform == "win32": # Only load on Windows
 		]
 
 	# --- DLLs ---
-	_kernel32 = _ctypes.WinDLL("kernel32", use_last_error=True)
-	_ntdll = _ctypes.WinDLL("ntdll", use_last_error=True)
+	_KERNEL32 = _ctypes.WinDLL("kernel32", use_last_error=True)
+	_NTDLL = _ctypes.WinDLL("ntdll", use_last_error=True)
 
 	# --- Function prototypes ---
-	_CreateFileW = _kernel32.CreateFileW
+	_CreateFileW = _KERNEL32.CreateFileW
 	_CreateFileW.argtypes = [
 		_wintypes.LPCWSTR, _wintypes.DWORD, _wintypes.DWORD,
 		_wintypes.LPVOID, _wintypes.DWORD, _wintypes.DWORD, _wintypes.HANDLE
 	]
 	_CreateFileW.restype = _wintypes.HANDLE
 
-	_CloseHandle = _kernel32.CloseHandle
+	_CloseHandle = _KERNEL32.CloseHandle
 	_CloseHandle.argtypes = [_wintypes.HANDLE]
 	_CloseHandle.restype = _wintypes.BOOL
 
-	_NtQueryInformationFile = _ntdll.NtQueryInformationFile
+	_NtQueryInformationFile = _NTDLL.NtQueryInformationFile
 	_NtQueryInformationFile.argtypes = [
 		_wintypes.HANDLE,
 		_ctypes.POINTER(_IO_STATUS_BLOCK),
@@ -60,7 +60,7 @@ if _sys.platform == "win32": # Only load on Windows
 	]
 	_NtQueryInformationFile.restype = _wintypes.ULONG
 
-	def isFolderCaseSensitive(path: str, throw_on_error: bool = True) -> bool:
+	def is_folder_case_sensitive(path: str, throw_on_error: bool = True) -> bool:
 		handle = _CreateFileW(
 			str(path),
 			0,  # no read access needed
@@ -102,11 +102,11 @@ if _sys.platform == "win32": # Only load on Windows
 		finally:
 			_CloseHandle(handle)
 else:
-	def isFolderCaseSensitive(destFolderParam: str) -> bool:
+	def is_folder_case_sensitive(dest_folder_param: str) -> bool:
 		raise NotImplementedError("Case sensitivity check only works on Windows")
 
 if __name__ == "__main__": # Example usage
 	from pathlib import Path as _Path
 
-	from myLibs.isFolderCaseSensitive import isFolderCaseSensitive
-	print(isFolderCaseSensitive(_Path(__file__).resolve().parent))
+	from my_libs.is_folder_case_sensitive import is_folder_case_sensitive
+	print(is_folder_case_sensitive(_Path(__file__).resolve().parent))

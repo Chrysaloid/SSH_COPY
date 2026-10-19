@@ -21,4 +21,4 @@ args=(
 # --verbose
 )
 
-python SSH_SYNC.py "${args[@]}"
+python ssh_sync.py "${args[@]}"

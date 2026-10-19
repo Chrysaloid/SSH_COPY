@@ -20,4 +20,4 @@ set args=%args% --print-common-date
 @REM set args=%args% --fast-remote-listdir-attr
 @REM set args=%args% --verbose
 
-python SSH_SYNC.py %args%
+python ssh_sync.py %args%

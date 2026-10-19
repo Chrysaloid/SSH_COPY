@@ -10,4 +10,4 @@ set args=%args% --remote-os win
 set args=%args% --cache-directory-listings
 set args=%args% --operation "G:/Test/Nowy folder/Source" remote "G:/Test/Nowy folder/Destination" remote sync "*.txt/true" false
 
-python SSH_SYNC_BULK.py %args%
+python ssh_sync_bulk.py %args%

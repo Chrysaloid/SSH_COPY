@@ -12,8 +12,8 @@ pip install termcolor paramiko pywin32
 
 ## Reusing these modules elsewhere (the `__package__` line)
 
-Several modules here are generally useful outside this project - `SimpleError`, `fileUtils`,
-`sshUtils`, `argparseUtils`, `commonConstants`, `mySystem`, `LocalSFTPAttributes` - and can
+Several modules here are generally useful outside this project - `simple_error`, `file_utils`,
+`ssh_utils`, `argparse_utils`, `common_constants`, `my_system`, `local_sftp_attributes` - and can
 be shared with another library by symlinking them into it. If you do that, **the first line
 of every module matters**:
 
@@ -24,22 +24,22 @@ from pathlib import Path as _Path; __package__ = __package__ or _Path(__file__).
 The `__package__ or` part is not decoration. The line exists so that relative imports work
 when a file is run directly, where Python leaves `__package__` empty. It must **never
 overwrite a `__package__` that Python already set**, because `.resolve()` follows a symlink:
-a module imported as `otherLib.sshUtils` through a link would otherwise rename its own
+a module imported as `otherLib.ssh_utils` through a link would otherwise rename its own
 package to `SSH_COPY`, and its `from .fileUtils import ...` would then load these files a
 **second time** under a second set of module names.
 
 That is not a theoretical cost. Two copies means two of every class, so `isinstance` and
-`issubclass` across the boundary silently answer False. It broke `SimpleError`, whose
+`issubclass` across the boundary silently answer False. It broke `simple_error`, whose
 `sys.excepthook` recognises its own class and so printed a full traceback for the other
-copy's identical-looking exceptions. `SimpleError` now also **chains** to the previously
+copy's identical-looking exceptions. `simple_error` now also **chains** to the previously
 installed excepthook instead of jumping back to `sys.__excepthook__`, so even a duplicated
 import degrades gracefully.
 
-Symlink targets should be **relative** (`../SSH_COPY/sshUtils.py`), not absolute: git stores
+Symlink targets should be **relative** (`../SSH_COPY/ssh_utils.py`), not absolute: git stores
 a symlink's target as the file's content, so an absolute target only resolves on the machine
 that created it.
 
-## SSH_SEND.py
+## ssh_send.py
 Copies selected files (and folders recursively) in Windows Explorer or Nautilus to a folder on a remote machine.
 
 It will open a terminal window that will automatically close if no errors occurred. If an error occurred the window will stay open so you can inspect the error message.
@@ -50,11 +50,11 @@ Create shortcut with the following content (with placeholders replaced) in *Targ
 
 Using Windows Terminal (recommended):
 ```
-wt --window new cmd /K @echo off && python SSH_SEND.py -u USERNAME -H HOSTNAME -p PASSWORD -r "REMOTEFOLDER" && exit
+wt --window new cmd /K @echo off && python ssh_send.py -u USERNAME -H HOSTNAME -p PASSWORD -r "REMOTEFOLDER" && exit
 ```
 Using cmd.exe:
 ```
-cmd /K @echo off && python SSH_SEND.py -u USERNAME -H HOSTNAME -p PASSWORD -r "REMOTEFOLDER" && exit
+cmd /K @echo off && python ssh_send.py -u USERNAME -H HOSTNAME -p PASSWORD -r "REMOTEFOLDER" && exit
 ```
 Put absolute path to `SSH_COPY` folder in the *Start in* field.
 
@@ -64,7 +64,7 @@ You can rename the shortcut and change its icon if you want. It's convenient  to
 
 *Target*:
 ```
-wt --window new cmd /K @echo off && python SSH_SEND.py -u Hello -H 192.168.0.123 -p world -r "C:\Users\Hello\Downloads" && exit
+wt --window new cmd /K @echo off && python ssh_send.py -u Hello -H 192.168.0.123 -p world -r "C:\Users\Hello\Downloads" && exit
 ```
 *Start in*:
 ```
@@ -84,8 +84,8 @@ Then in Nautilus you can select file(s) and/or folder(s) and right click and the
 **Full help output:**
 
 ```
-usage: SSH_SEND.py [-h] -u USERNAME -H HOSTNAME [HOSTNAME ...] -p PASSWORD -r REMOTEFOLDER [-P PORT]
-                   [-T SECONDS] [-t] [-0] [-c ENDCOMMAND] [-d] [-i]
+usage: ssh_send.py [-h] -u USERNAME -H HOSTNAME [HOSTNAME ...] -p PASSWORD -r REMOTE_FOLDER
+                   [-P PORT] [-T SECONDS] [-t] [-0] [-c END_COMMAND] [-d] [-i]
 
 Copies selected files (and folders recursively) in Windows Explorer or Nautilus to a folder on a
 remote machine.
@@ -96,7 +96,7 @@ Required arguments:
                               Remote host's address. You can specify multiple if host can appear
                               under multiple adresses
   -p, --password PASSWORD     Remote password
-  -r, --remote-folder REMOTEFOLDER
+  -r, --remote-folder REMOTE_FOLDER
                               Remote folder's absolute path
 
 Optional arguments:
@@ -106,7 +106,7 @@ Optional arguments:
   -t, --preserve-times        If set, modification times will be preserved
   -0, --zero-file             Create a file named 0 at the end of transfer. Useful for file-watching
                               scripts on the remote machine
-  -c, --end-command ENDCOMMAND
+  -c, --end-command END_COMMAND
                               Command to run on the remote machine after file transfer
   -d, --dont-close            Don't auto-close console window at the end if no error occurred. You
                               will have to close it manually or by pressing ENTER
@@ -119,14 +119,14 @@ Optional arguments:
 Attempting to connect to Hello@192.168.0.123 ...
 Sending files:
 
-SSH_SEND.py
+ssh_send.py
 
 Successfully sent 1 file(s)
 
 Execution time: 0.169 s
 ```
 
-## SSH_SYNC.py
+## ssh_sync.py
 Copy or synchronize files between folders on remote or local machines.
 
 **This script can work fully locally** if you omit the SSH authorization details. Then the `-r/--remote-folder` argument ACTUALLY refers to a local folder and only the order of folder arguments matters.
@@ -154,7 +154,7 @@ Since you'd be running this not too often and the setup can get pretty big I sug
 **Full help output:**
 
 ```
-usage: SSH_SYNC.py [-h] -l ABSOLUTE_PATH -r ABSOLUTE_PATH [-i [PATTERN_1 [PATTERN_2 ...]]]
+usage: ssh_sync.py [-h] -l ABSOLUTE_PATH -r ABSOLUTE_PATH [-i [PATTERN_1 [PATTERN_2 ...]]]
                    [-e [PATTERN_1 [PATTERN_2 ...]]] [-c [PATTERN_1 [PATTERN_2 ...]]]
                    [-a [PATTERN_1 [PATTERN_2 ...]]] [-I [PATTERN_1 [PATTERN_2 ...]]]
                    [-E [PATTERN_1 [PATTERN_2 ...]]] [-C [PATTERN_1 [PATTERN_2 ...]]]
@@ -319,7 +319,7 @@ Source      folder: G:/Test/Source
 Destination folder: G:/Test/Destination
 Copying files:
 
-/SSH_SYNC.py
+/ssh_sync.py
 
 Execution time: 0.171 s
 ```
@@ -333,17 +333,17 @@ Source      folder: G:/Test/Source
 Destination folder: G:/Test/Destination
 Syncing files:
 
-source -> destination: /SSH_SYNC.py
+source -> destination: /ssh_sync.py
 
 Execution time: 0.156 s
 ```
 
-## SSH_SYNC_BULK.py
-This script is for when you want to sync multiple folders in different places. Currently `SSH_SYNC.py` is unable to do that as it has single input folder and single output folder and can only perform recursion. You have to do a lot of exclusions if you want to sync multiple folders in different locations on the drive (you start from root and exclude your way to the said folders and the script would have to potentially do large amounts of unnecessary navigation) and **you have to** launch the script multiple times if the folders are on different drives on Windows. That's why this script was made. It is simpler than `SSH_SYNC.py`:
+## ssh_sync_bulk.py
+This script is for when you want to sync multiple folders in different places. Currently `ssh_sync.py` is unable to do that as it has single input folder and single output folder and can only perform recursion. You have to do a lot of exclusions if you want to sync multiple folders in different locations on the drive (you start from root and exclude your way to the said folders and the script would have to potentially do large amounts of unnecessary navigation) and **you have to** launch the script multiple times if the folders are on different drives on Windows. That's why this script was made. It is simpler than `ssh_sync.py`:
 
 - It does not perform recursion and does not copy folders (it also won't create empty subfolders in the destination).
 - Case-insensitivity of file names on Windows was ignored - use `fsutil file setCaseSensitiveInfo "C:/path to folder" enable` to enable case-sensitivity for your folder(s) if you care about the edge-cases.
-- It lacks some functionality of `SSH_SYNC.py` but is enough for my current use-case so I am not going adding it at the moment.
+- It lacks some functionality of `ssh_sync.py` but is enough for my current use-case so I am not going adding it at the moment.
 - It requires working python 3 on the remote machine for fast directory listing.
 
 The main part of using the script is specifying multiple `--operation` arguments of signature `SOURCE_DIR SOURCE_PLACE DEST_DIR DEST_PLACE MODE FILE_PATTERNS DEFAULT_MATCH` (all copying operations are on condition that only a newer version of the file will overwrite an older version of the file):
@@ -362,15 +362,15 @@ The main part of using the script is specifying multiple `--operation` arguments
 - `FILE_PATTERNS` - a 2-column table of glob patterns and their matching values. I.e. `"*.png/true|*.jpg/false"`. Rows are delimited by `|` and columns are delimited by `/`. `fnmatchcase` is used to match filenames to the patterns. Boolean true means that files that match the pattern will be included in the copy and false means that they will be excluded in the copy. You can use `"1" | "true" | "t" | "yes" | "yeah" | "yup" | "tak" | "on"` as true values and `"0" | "false" | "f" | "no" | "nah" | "nope" | "nie" | "off"` as false values
 - `DEFAULT_MATCH` - if none of the patterns match this will be used to determine if file should be copied
 
-Examples scripts `ssh-sync-bulk-example.bat`, `ssh-sync-bulk-example.sh` and `ssh-sync-bulk-example.py` demonstrate usage of this script. Python example avoids calling `argparse`'s `parse_args()` and is therefore a bit faster.
+Examples scripts `ssh-sync-bulk-example.bat`, `ssh-sync-bulk-example.sh` and `ssh_sync_bulk_example.py` demonstrate usage of this script. Python example avoids calling `argparse`'s `parse_args()` and is therefore a bit faster.
 
 **Full help output:**
 
 ```
-usage: SSH_SYNC_BULK.py [-h]
+usage: ssh_sync_bulk.py [-h]
                         -o SOURCE_DIR SOURCE_PLACE DEST_DIR DEST_PLACE MODE FILE_PATTERNS DEFAULT_MATCH
-                        -u USERNAME -H HOSTNAME [HOSTNAME ...] [-p PASSWORD] [-P PORT] [-T SECONDS]
-                        [-v] [-s] [-d] [-O REMOTEOS] [-c]
+                        [-u USERNAME] [-H [HOSTNAME ...]] [-S [HOSTS ...]] [-p PASSWORD] [-P PORT]
+                        [-T SECONDS] [-v] [-s] [-d] [-O REMOTE_OS] [-c]
 
 Copy, move or sync files between folders on remote or local machines
 
@@ -378,9 +378,12 @@ Required arguments:
   -o, --operation SOURCE_DIR SOURCE_PLACE DEST_DIR DEST_PLACE MODE FILE_PATTERNS DEFAULT_MATCH
                               Operation to perform. Can be specified multiple times
   -u, --username USERNAME     Remote username
-  -H, --hostname HOSTNAME [HOSTNAME ...]
+  -H, --hostname [HOSTNAME ...]
                               Remote host's address. You can specify multiple if host can appear
                               under multiple adresses
+  -S, --hosts [HOSTS ...]     Remote hosts to try (i.e. user@192.168.0.123:1234). You can specify
+                              multiple if host can appear under multiple adresses. Takes precedence
+                              over others
 
 Optional arguments:
   -h, --help                  show this help message and exit
@@ -391,12 +394,12 @@ Optional arguments:
   -s, --silent                Print only errors
   -d, --dry-run               Do not perform any copying and just print the information that would
                               normally be printed. Good for testing
-  -O, --remote-os REMOTEOS    Remote host's operating system. Can be (a, auto, auto-detect) or (w,
+  -O, --remote-os REMOTE_OS   Remote host's operating system. Can be (a, auto, auto-detect) or (w,
                               win, windows) or (u, unix, l, linux, p, posix) or (m, mac, macos,
                               darwin) or (t, termux) or (n, android) or (b, bsd, freebsd, openbsd,
-                              netbsd, dragonfly) or (s, solaris, sunos, illumos). Windows just
-                              needs to be handled in a special way so we need to differentiate it
-                              from the others. Auto will run a few commands on the remote machine to
+                              netbsd, dragonfly) or (s, solaris, sunos, illumos). Windows just needs
+                              to be handled in a special way so we need to differentiate it from the
+                              others. Auto will run a few commands on the remote machine to
                               determine it's OS and they are not 100% relaible so if you know the
                               remote's OS and want to save time you can use this argument (default:
                               auto)
@@ -419,7 +422,7 @@ Attempting to connect to Test@192.168.0.121 ...
 # Source (REMOTE): G:/Test/Nowy folder/Source
 # Dest   (LOCAL ): G:/Test/Nowy folder/Destination
 # Mode: SYNC
-# File patterns: *.txt | defaultMatch
+# File patterns: *.txt | default_match
 # Source file count: 2
 # Dest   file count: 1
 # Newest common date: 2025-10-05 14:48:24 - 8.9 months ago
@@ -428,20 +431,20 @@ S -> D: Nowy dokument tekstowy — kopia.txt
 Execution time: 0.349 s
 ```
 
-## ~~SSH_GET.py~~
-It is similar to `SSH_SEND.py` but it copies selected files on the remote machine to a local folder.
+## ~~ssh_get.py~~
+It is similar to `ssh_send.py` but it copies selected files on the remote machine to a local folder.
 
 Unfortunately it does not work :( - it is impossible at the moment to get the selected files from Explorer or Nautilus on a remote machine.
 
 But we leave it here in case if we solve the above problem.
 
-Setup and usage is very similar `SSH_SEND.py` so we only put the help print here.
+Setup and usage is very similar `ssh_send.py` so we only put the help print here.
 
 **Full help output:**
 
 ```
-usage: SSH_GET.py [-h] -u USERNAME -H HOSTNAME -p PASSWORD -l LOCALFOLDER -r REMOTEGETFILESSCRIPT
-                  [-P PORT] [-T TIMEOUT] [-t] [-d]
+usage: ssh_get.py [-h] -u USERNAME -H HOSTNAME -p PASSWORD -l LOCAL_FOLDER
+                  -r REMOTE_GET_FILES_SCRIPT [-P PORT] [-T TIMEOUT] [-t] [-d]
 
 Copies selected files (and folders recursively) in Windows Explorer or Nautilus from a folder on a
 remote machine.
@@ -451,10 +454,11 @@ options:
   -u, --username USERNAME     Remote username
   -H, --hostname HOSTNAME     Remote host's address
   -p, --password PASSWORD     Remote password
-  -l, --local-folder LOCALFOLDER
+  -l, --local-folder LOCAL_FOLDER
                               Local folder's absolute path
-  -r, --remote-get-files-script REMOTEGETFILESSCRIPT
-                              Remote getSelectedFilesFromExplorerRecurseStdOut.py absolute path
+  -r, --remote-get-files-script REMOTE_GET_FILES_SCRIPT
+                              Remote get_selected_files_from_explorer_recurse_stdout.py absolute
+                              path
   -P, --port PORT             Remote port (default: 22)
   -T, --timeout TIMEOUT       TCP 3-way handshake timeout in seconds (default: 5.0)
   -t, --preserve-times        If set, modification times will be preserved

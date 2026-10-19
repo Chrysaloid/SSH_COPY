@@ -7,7 +7,7 @@ way in - here Pydroid. Start this script from Pydroid inside the folder and keep
 it serves:
 
 - exec requests (ssh host "command"), with stdin/stdout/stderr and the exit status. This is
-  what ssh_script_runner.py and myLibs.sshUtils rely on.
+  what ssh_script_runner.py and my_libs.ssh_utils rely on.
 - an interactive shell (ssh host), with a pty when the client asks for one.
 - the sftp subsystem, over the real filesystem, so sftp and paramiko's open_sftp work.
 
@@ -43,9 +43,9 @@ from collections.abc import Callable
 import paramiko
 from termcolor import colored as clr
 
-from .commonConstants import COLOR_ERROR, COLOR_WARN
-from .fileUtils import ensureFolderExists, readLines, writeTextFile
-from .SimpleError import SimpleError
+from .common_constants import COLOR_ERROR, COLOR_WARN
+from .file_utils import ensure_folder_exists, read_lines, write_text_file
+from .simple_error import Simple_error
 
 #* configuration
 
@@ -69,7 +69,7 @@ logger = logging.getLogger("ssh-server")
 
 LEVEL_COLORS = {logging.WARNING: COLOR_WARN, logging.ERROR: COLOR_ERROR, logging.CRITICAL: COLOR_ERROR}
 
-class ColoredFormatter(logging.Formatter):
+class Colored_Formatter(logging.Formatter):
 	"""The console only: warnings and errors in the usual SSH_COPY colours. The log file stays plain."""
 	def format(self, record: logging.LogRecord) -> str:
 		text = super().format(record)
@@ -82,9 +82,9 @@ def setup_logging() -> None:
 	and level). paramiko's own warnings and errors - a transport or SFTP exception with its
 	traceback - land in both too, as does anything uncaught, in any thread.
 	"""
-	ensureFolderExists(os.path.dirname(LOG_FILE))
+	ensure_folder_exists(os.path.dirname(LOG_FILE))
 	console = logging.StreamHandler(sys.stdout)
-	console.setFormatter(ColoredFormatter("%(asctime)s %(message)s", "%H:%M:%S"))
+	console.setFormatter(Colored_Formatter("%(asctime)s %(message)s", "%H:%M:%S"))
 	file = logging.FileHandler(LOG_FILE, encoding="utf-8")
 	file.setFormatter(logging.Formatter("%(asctime)s %(levelname)-7s %(message)s", "%Y-%m-%dT%H:%M:%S%z"))
 	root = logging.getLogger()
@@ -108,7 +108,7 @@ def load_authorized_keys() -> set[str]:
 	lines = list(AUTHORIZED_KEYS)
 	extra_file = os.path.join(SERVER_HOME, "authorized_keys")
 	if os.path.isfile(extra_file):
-		lines += readLines(extra_file)
+		lines += read_lines(extra_file)
 	return {line.split()[1] for line in lines if len(line.split()) >= 2 and not line.startswith("#")}
 
 def load_or_create_host_key() -> paramiko.PKey:
@@ -316,7 +316,7 @@ class Server(paramiko.ServerInterface):
 def sftp_error(error: OSError) -> int:
 	return paramiko.SFTPServer.convert_errno(error.errno)
 
-class LocalSftpHandle(paramiko.SFTPHandle):
+class Local_sftp_handle(paramiko.SFTPHandle):
 	def stat(self) -> paramiko.SFTPAttributes | int:
 		try:
 			return paramiko.SFTPAttributes.from_stat(os.fstat(self.readfile.fileno()))
@@ -330,7 +330,7 @@ class LocalSftpHandle(paramiko.SFTPHandle):
 		except OSError as error:
 			return sftp_error(error)
 
-class LocalSftpServer(paramiko.SFTPServerInterface):
+class Local_sftp_server(paramiko.SFTPServerInterface):
 	@staticmethod
 	def local(path: str) -> str:
 		return os.path.normpath(path if os.path.isabs(path) else os.path.join(SERVER_HOME, path))
@@ -378,7 +378,7 @@ class LocalSftpServer(paramiko.SFTPServerInterface):
 		except OSError as error:
 			return sftp_error(error)
 
-	def open(self, path: str, flags: int, attr: paramiko.SFTPAttributes | None) -> LocalSftpHandle | int:
+	def open(self, path: str, flags: int, attr: paramiko.SFTPAttributes | None) -> Local_sftp_handle | int:
 		local_path = self.local(path)
 		mode = getattr(attr, "st_mode", None)
 		try:
@@ -398,7 +398,7 @@ class LocalSftpServer(paramiko.SFTPServerInterface):
 		else:
 			file_mode = "rb"
 		file = os.fdopen(fd, file_mode)
-		handle = LocalSftpHandle(flags)
+		handle = Local_sftp_handle(flags)
 		handle.filename = local_path
 		handle.readfile = file
 		handle.writefile = file
@@ -438,7 +438,7 @@ def handle_connection(client: socket.socket, address: tuple[str, int], host_key:
 	log(f"connection from {address[0]}:{address[1]}")
 	transport = paramiko.Transport(client)
 	transport.add_server_key(host_key)
-	transport.set_subsystem_handler("sftp", paramiko.SFTPServer, LocalSftpServer)
+	transport.set_subsystem_handler("sftp", paramiko.SFTPServer, Local_sftp_server)
 	try:
 		transport.start_server(server=Server(load_authorized_keys()))
 	except (paramiko.SSHException, EOFError, OSError) as error:
@@ -458,10 +458,10 @@ def lan_address() -> str | None:
 		return None
 
 def main() -> None:
-	ensureFolderExists(SERVER_HOME)
+	ensure_folder_exists(SERVER_HOME)
 	setup_logging()
 	log(f"--- starting, log file {LOG_FILE}")
-	writeTextFile(SHELL_RC_FILE, shell_prelude())
+	write_text_file(SHELL_RC_FILE, shell_prelude())
 	host_key = load_or_create_host_key()
 	log(f"python {sys.version.split()[0]} at {sys.executable}, paramiko {paramiko.__version__}")
 	log(f"home {SERVER_HOME}, shell {SHELL}, uid {os.getuid()}")
@@ -474,7 +474,7 @@ def main() -> None:
 			server.bind((LISTEN_ADDRESS, PORT))
 		except OSError as error:
 			if error.errno == errno.EADDRINUSE:
-				raise SimpleError(f"port {PORT} is already taken - is a previous ssh-server.py still running?", None) from error
+				raise Simple_error(f"port {PORT} is already taken - is a previous ssh-server.py still running?", None) from error
 			raise
 		server.listen(16)
 		addresses = ", ".join(address for address in (lan_address(), "127.0.0.1") if address)
@@ -488,7 +488,7 @@ if __name__ == "__main__":
 		main()
 	except KeyboardInterrupt:
 		log("stopped")
-	except SimpleError as error: # An expected failure - its message says it all, no traceback
+	except Simple_error as error: # An expected failure - its message says it all, no traceback
 		logger.critical(f"server stopped: {error}")
 		raise SystemExit(1)
 	except Exception:
