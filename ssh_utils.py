@@ -1,11 +1,12 @@
 from pathlib import Path as _Path; __package__ = __package__ or _Path(__file__).resolve().parent.name # To be able to use relative imports when run directly - never override a __package__ Python already set (see README)
 
 import base64 as _base64
-from collections.abc import Callable as _Callable
+from collections.abc import Callable as _Callable, Sequence as _Sequence
 from enum import auto, IntEnum
 from functools import partial as _partial
 import logging as _logging
 import queue as _queue
+import re as _re
 import socket as _socket
 import threading as _threading
 
@@ -463,20 +464,70 @@ class Remote_list_dir:
 			))
 		return entries
 
-def remote_has_python(ssh: _paramiko.SSHClient, throw_on_not_found = True, enforce_python_ver = "3") -> str:
+_DOTTED_VERSION = _re.compile(r"\d+(?:\.\d+)+")
+_BARE_VERSION   = _re.compile(r"\d+")
+
+def _find_version(outputs: list[str]) -> str:
+	""" The first dotted number in any of the outputs, else the first bare one, else "" """
+	for pattern in (_DOTTED_VERSION, _BARE_VERSION):
+		for output in outputs:
+			if match := pattern.search(output):
+				return match.group()
+	return ""
+
+def version_matches(version: str, expected_version: str) -> bool:
+	""" Whether version is expected_version or one of its sub-versions: "3.13.5" matches "3" and "3.13", not "3.1" """
+	return not expected_version or version == expected_version or version.startswith(expected_version + ".")
+
+def remote_has_program(
+	ssh: _paramiko.SSHClient,
+	candidates: str | _Sequence[str],
+	expected_version: str = "",
+	version_argument: str = "--version",
+	throw_on_not_found: bool = True,
+) -> tuple[str, str]:
+	"""
+	The first of candidates that runs on the remote as `<candidate> <version_argument>`, exits 0
+	and reports a version matching expected_version (see version_matches; "" takes any), together
+	with that version: ("python3", "3.12.3"). The version is the first dotted number of stdout,
+	else of stderr, else the first bare number - "Python 3.12.3", "v22.11.0", "GNU bash, version
+	5.2.37(1)" and "PowerShell 7.6.6" all work, and Python 2 printed its version to stderr. A candidate is
+	put on the command line as is, so it may be a full path, quoted for the remote shell.
+
+	Windows PowerShell 5.1 has no --version: give it version_argument
+	"-NoProfile -Command $PSVersionTable.PSVersion.ToString()".
+
+	Raises Simple_error when none qualifies, or returns ("", "") with throw_on_not_found=False.
+	"""
+	if isinstance(candidates, str):
+		candidates = [candidates]
+
+	for candidate in candidates:
+		stdin, stdout, stderr = ssh.exec_command(f"{candidate} {version_argument}")
+		stdin.close()
+		# stdout first: WSL's bash.exe puts a systemd warning on stderr, and Python 2 its version
+		outputs = [stream.read().decode(errors="ignore") for stream in (stdout, stderr)]
+		# A missing program exits non-zero everywhere - and the Windows Store "python" stub prints
+		# its install-me message with 9009
+		if stdout.channel.recv_exit_status() != 0:
+			continue
+		if (version := _find_version(outputs)) and version_matches(version, expected_version):
+			return candidate, version
+
+	if throw_on_not_found:
+		wanted = f" {expected_version}" if expected_version else ""
+		raise _Simple_error(f"None of {', '.join(candidates)}{wanted} found remotely")
+	return "", ""
+
+def remote_has_python(ssh: _paramiko.SSHClient, throw_on_not_found: bool = True, enforce_python_ver: str = "3") -> str:
 	"""
 	Returns python alias that worked.
 	You can pass empty str as enforce_python_ver to not enforce version.
 	"""
-	for candidate in ("python", "python3", "py"):
-		stdin, stdout, stderr = ssh.exec_command(f"{candidate} --version")
-		if stdout.read().decode(errors="ignore").strip().lower().startswith(f"python {enforce_python_ver}"):
-			return candidate
-
-	if throw_on_not_found:
-		raise _Simple_error(f"No Python found remotely")
-	else:
-		return ""
+	try:
+		return remote_has_program(ssh, ("python", "python3", "py"), enforce_python_ver, throw_on_not_found=throw_on_not_found)[0]
+	except _Simple_error:
+		raise _Simple_error(f"No Python found remotely") from None
 
 if __name__ == "__main__": # Example usage
 	from my_libs.ssh_utils import get_ssh
