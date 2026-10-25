@@ -85,8 +85,13 @@ def _connect_once(
 	timeout: float,
 	silent: bool,
 	pinned_keys: list[_paramiko.PKey] | None,
+	sock: _socket.socket | None = None,
 ) -> tuple[str | None, bool]:
-	""" One login attempt. Returns (error_message, address_is_dead) - error_message None means ssh is connected """
+	"""
+	One login attempt. Returns (error_message, address_is_dead) - error_message None means ssh is
+	connected. sock is a TCP connection to hostname:port made beforehand (see _open_socket);
+	paramiko then logs in over it instead of connecting by itself.
+	"""
 	error_message = None
 	address_is_dead = False
 	if pinned_keys:
@@ -105,6 +110,7 @@ def _connect_once(
 			key_filename = key_filename,
 			timeout      = timeout     ,
 			port         = port        ,
+			sock         = sock        ,
 		)
 	except _BadHostKeyException as e:
 		address_is_dead = True
@@ -152,25 +158,52 @@ def _connect_once(
 		# on this client would just drop the reference to it - a live connection leaked per failure.
 		# Closing keeps the client reusable, host keys included.
 		ssh.close()
+		if sock is not None:
+			sock.close() # paramiko may have failed before its transport took the socket over
 
 	return error_message, address_is_dead
 
+def _open_socket(hostname: str, port: int, timeout: float) -> tuple[_socket.socket | None, str | None]:
+	""" A TCP connection to hostname:port, or None and the error _connect_once would have reported for it """
+	try:
+		return _socket.create_connection((hostname, port), timeout=timeout), None
+	except TimeoutError:
+		return None, f"ERROR: Connection to {hostname} timed out after {timeout} seconds"
+	except _socket.gaierror as e:
+		return None, f"ERROR: Socket error while connecting to {hostname}: {e}"
+	except OSError:
+		return None, f"ERROR: No valid connections could be made to {hostname} (connection refused or unreachable)"
+
+# How long an address that has its TCP connection waits for the one connected before it to log in.
+# Two SSH handshakes at once cost both of them: to this PC's own sshd, racing two of its addresses
+# took 396 ms against 218 ms for one (2026-10-25) - the key exchanges share this process (and there
+# the CPU with sshd). Past the head start, a handshake that hangs no longer holds the others up.
+HANDSHAKE_HEAD_START_SECONDS = 1.0
+
 def _connect_in_parallel(
 	options: dict[tuple[str, int], list[str]],
-	attempt: _Callable[[_paramiko.SSHClient, str, str, int], tuple[str | None, bool]],
+	attempt: _Callable[..., tuple[str | None, bool]],
 	pinned_keys: list[_paramiko.PKey] | None,
+	timeout: float,
 	silent: bool,
 ) -> tuple[_paramiko.SSHClient | None, bool]:
 	"""
 	Tries every address at once, one daemon thread each, going through its usernames in order.
 	Returns the first client that logs in (None if none did) and whether an error was printed
-	before that. The losing threads are left to finish on their own: one that still logs in
-	closes its client, and nothing they hit afterwards is printed. Daemon threads, so a
-	connect still hanging in one of them never holds up the interpreter's exit.
+	before that.
+
+	Only the TCP connections race freely. The SSH handshakes then go one at a time, in the order
+	the connections were made - so the fastest address logs in alone, unslowed by the others -
+	except that one taking longer than HANDSHAKE_HEAD_START_SECONDS lets the next one start
+	beside it. Once one has logged in, the others close their connections without logging in.
+	The losing threads are left to finish on their own and nothing they hit afterwards is
+	printed. Daemon threads, so a connect still hanging in one of them never holds up the
+	interpreter's exit.
 	"""
 	results: _queue.SimpleQueue[_paramiko.SSHClient | Exception | None] = _queue.SimpleQueue()
 	lock = _threading.Lock() # makes "who won" and every print after it one decision
 	won = _threading.Event()
+	handshake_turn = _threading.Lock()
 	there_was_ssh_error = False
 
 	def try_address(hostname: str, port: int, usernames: list[str]) -> None:
@@ -181,7 +214,18 @@ def _connect_in_parallel(
 			for i, username in enumerate(usernames):
 				if won.is_set():
 					break
-				error_message, address_is_dead = attempt(ssh, username, hostname, port)
+				sock, error_message = _open_socket(hostname, port, timeout)
+				address_is_dead = sock is None
+				if sock is not None:
+					has_turn = handshake_turn.acquire(timeout=HANDSHAKE_HEAD_START_SECONDS)
+					try:
+						if won.is_set():
+							sock.close()
+							break
+						error_message, address_is_dead = attempt(ssh, username, hostname, port, sock=sock)
+					finally:
+						if has_turn:
+							handshake_turn.release()
 				with lock:
 					if won.is_set():
 						break # the caller already has its connection - stay quiet
@@ -253,8 +297,11 @@ def get_ssh(
 
 	parallel_connect tries all addresses (hostname+port) at once instead of one by one, each
 	going through its users in the order given, and returns the first client that logs in -
-	still synchronously. Errors the other addresses hit after that are not printed. With only
-	one address there is nothing to race, so the hosts are then tried one by one regardless.
+	still synchronously. Only the TCP connections race: the logins follow one at a time in the
+	order the connections came, each with a head start before the next one joins in (see
+	_connect_in_parallel), so a second working address costs the winner nothing. Errors the
+	other addresses hit after that are not printed. With only one address there is nothing to
+	race, so the hosts are then tried one by one regardless.
 	"""
 	# paramiko reports a failed connection twice: as the exception handled below, and through
 	# the "paramiko" logger, from its transport thread, as "Exception (client): ..." plus a
@@ -295,7 +342,7 @@ def get_ssh(
 
 	parallel_connect = parallel_connect and len(options) > 1
 	if parallel_connect:
-		ssh, there_was_ssh_error = _connect_in_parallel(options, attempt, pinned_keys, silent)
+		ssh, there_was_ssh_error = _connect_in_parallel(options, attempt, pinned_keys, timeout, silent)
 		if ssh is None:
 			raise _Simple_error("", None)
 		return ssh, there_was_ssh_error
