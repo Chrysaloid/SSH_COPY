@@ -1,6 +1,7 @@
 from pathlib import Path as _Path; __package__ = __package__ or _Path(__file__).resolve().parent.name # To be able to use relative imports when run directly - never override a __package__ Python already set (see README)
 
 from datetime import datetime as _datetime
+from enum import auto, IntEnum
 import glob as _glob
 import os as _os
 import re as _re
@@ -143,7 +144,8 @@ def recycle(path: str | _Path) -> None:
 	if _os.path.lexists(path):
 		raise OSError(f"{path} still exists after the recycle attempt")
 
-def sanitize_filename(name: str):
+def sanitize_filename(name: str, sub_char = "_"):
+	r""" `sub_char`: substitute character for invalid charactes """
 	name = name.strip().rstrip(".")
 
 	# Split extension safely
@@ -156,7 +158,7 @@ def sanitize_filename(name: str):
 		ext = ""
 
 	# Replace invalid characters
-	base = INVALID_FILENAME_CHARS.sub("_", base)
+	base = INVALID_FILENAME_CHARS.sub(sub_char, base)
 
 	# Remove trailing dots/spaces (Windows rule)
 	base = base.rstrip(". ")
@@ -229,6 +231,32 @@ def assert_folder_exists(path: str, additional_comment = ""):
 
 def ensure_folder_exists(path: str):
 	_os.makedirs(path, exist_ok=True)
+
+class Action(IntEnum):
+	NOTHING = auto()
+	WARN    = auto()
+	ERROR   = auto()
+
+def ensure_folder_is_deleted(path: str | _Path, not_folder_action = Action.WARN, warn_comment = " - skipping"):
+	folder = _Path(path).resolve()
+
+	if not folder.exists():
+		return True
+
+	if not folder.is_dir(follow_symlinks = False):
+		match not_folder_action:
+			case Action.NOTHING:
+				return False
+			case Action.WARN:
+				_cprint(f'"{path}" is not a folder{warn_comment}', _COLOR_WARN)
+				return False
+			case Action.ERROR:
+				raise _Simple_error(f'"{path}" is not a folder')
+			case _:
+				raise _Simple_error(f"Invalid not_folder_action: {not_folder_action}")
+
+	_shutil.rmtree(folder)
+	return True
 
 def iter_scan_dir(path: str):
 	"""
