@@ -15,7 +15,7 @@ from .list_get import list_get
 from .simple_error import Simple_error as _Simple_error
 
 WINDOWS_RESERVED_NAMES = set("con, prn, aux, nul, com1, com2, com3, com4, com5, com6, com7, com8, com9, com¹, com², com³, lpt1, lpt2, lpt3, lpt4, lpt5, lpt6, lpt7, lpt8, lpt9, lpt¹, lpt², lpt³".split(", "))
-INVALID_FILENAME_CHARS = _re.compile(r'[<>:"/\|?*\x00-\x1F]')
+INVALID_FILENAME_CHARS = _re.compile(r'[<>:"/\\|?*\x00-\x1F]')
 FILENAME_EXT_SPLIT = _re.compile(r"^(.*?)(\.\w*?)$")
 
 def read(path: str | _Path, encoding="UTF-8", newline="\n"):
